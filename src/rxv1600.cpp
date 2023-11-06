@@ -262,6 +262,7 @@ static const std::map<uint8_t, const char *> RPTS = {
     { 0xA0, "Zone3Input"},
     { 0xA1, "Zone3Mute"},
     { 0xA2, "Zone3Volume"},
+    { 0xA5, "MuteType"},
     { 0xA7, "EqualizerType"},
     { 0xA8, "ToneBypass"},
 
@@ -616,7 +617,17 @@ static const std::map<uint16_t, const char *> VALS = {
     { 0x6E05, "Neo:6 Music" },
 
     // Multi channel select
-    { 0x7B00, "Pro Logic" },
+    { 0x7B00, "6ch" },
+    { 0x7B01, "8ch Tuner" },
+    { 0x7B02, "8ch CD" },
+    { 0x7B03, "8ch CD-R" },
+    { 0x7B04, "8ch MD/TAPE" },
+    { 0x7B05, "8ch DVD" },
+    { 0x7B06, "8ch DTV" },
+    { 0x7B07, "8ch CBL/SAT" },
+    { 0x7B09, "8ch VCR1" },
+    { 0x7B0A, "8ch DVR/VCR2" },
+    { 0x7B0C, "8ch V-AUX" },
 
     // Night mode parameters
     { 0x8B00, "Off" },
@@ -656,6 +667,9 @@ static const std::map<uint16_t, const char *> VALS = {
     // TODO more values possible, check with Zone3VolumeText
     { 0xA2E8, "16.5 dB" },
 
+    { 0xA500, "Full" },
+    { 0xA501, "-20 dB" },
+    
     // EQ select type
     { 0xA700, "Auto Peq" },
     { 0xA701, "Geq" },
@@ -762,8 +776,8 @@ bool RxV1600::decode( const char *resp, uint8_t &id, guard_t &guard, origin_t &o
     if( resp[2] < '0' || resp[2] > '2' ) return false;
 
     uint8_t val[4];
-    for( int i=3; i<7; i++) {
-        val[i-3] = nibble(resp[i]);
+    for( int i=0; i<sizeof(val); i++) {
+        val[i] = nibble(resp[i+3]);
         if( val[i] == UNKNOWN_VALUE ) return false;
     }
 
@@ -872,7 +886,7 @@ bool RxV1600::decodeConfig( const char *resp, bool &power ) {
     _status[0x7B] = nibble(*(curr++));  // Multi channel select
     curr++;  // Remote ID XM
     _status[0xBB] = nibble(*(curr++));  // Bi-Amp
-    curr += 139-1135;  // skip DT135-DT138
+    curr += 139-135;  // skip DT135-DT138
     _status[0x4B] = nibble(*(curr++));  // Zone 2 Bass
     _status[0x4C] = nibble(*(curr++));  // Zone 2 Treble
     _status[0x4D] = nibble(*(curr++));  // Zone 3 Bass
