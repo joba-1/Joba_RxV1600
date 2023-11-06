@@ -5,12 +5,12 @@
 
 
 // ASCII control characters used by the protocol
-#define STX "\0x02"
-#define ETX "\0x03"
-#define DC1 "\0x11"
-#define DC2 "\0x12"
-#define DC3 "\0x13"
-#define DEL "\0x7F"
+#define STX "\x02"
+#define ETX "\x03"
+#define DC1 "\x11"
+#define DC2 "\x12"
+#define DC3 "\x13"
+#define DEL "\x7F"
 
 
 struct key1_less_key2 {

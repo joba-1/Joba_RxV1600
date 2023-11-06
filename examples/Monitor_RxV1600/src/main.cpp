@@ -1,17 +1,17 @@
+/// Print RX-V1600 configuration and status changes as text
+
 #include <Arduino.h>
 
 #include <rxv1600.h>
 
-/// Print RX-V1600 configuration and status changes as text
-
-RxV1600Comm rxvcomm(Serial);
+RxV1600Comm rxvcomm(Serial1);
 RxV1600 rxv;
 
 void recvd( const char *resp, void *ctx ) {
     bool power;
     uint8_t id;
-    guard_t guard;
-    origin_t origin;
+    RxV1600::guard_t guard;
+    RxV1600::origin_t origin;
     char text[9];
 
     if( resp ) {
@@ -29,7 +29,7 @@ void recvd( const char *resp, void *ctx ) {
                     }
                 }
                 else {
-                    Serial.printf("Config id %u is unknown\n", i);
+                    Serial.printf("Config id x%02x is unknown\n", i);
                 }
             }
         }
@@ -51,10 +51,12 @@ void recvd( const char *resp, void *ctx ) {
 
 void setup() {
     Serial.begin(BAUDRATE);
+    Serial.println(HOSTNAME " " __TIMESTAMP__ " starting");
     Serial1.begin(9600, SERIAL_8N1, 16, 17);  // chosen arbitrary rx, tx pins
     rxvcomm.on_recv(recvd, NULL);
     // Send ready to RX-V1600 to receive config
     rxvcomm.send(rxv.command("Ready"));
+    Serial.println("Sent Ready message");
 }
 
 void loop() {
