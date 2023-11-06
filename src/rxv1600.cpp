@@ -417,19 +417,15 @@ static const std::map<uint16_t, const char *> VALS = {
 
     // Main volume
     { 0x2600, "Infinite" },
-    { 0x2627, "-80 dB" },  
-    /// @todo more values possible, check with MainVolumeText
+    // { 0x2627, "-80 dB" },   calculated
     { 0x26C7, "0 dB" },
-    /// @todo more values possible, check with MainVolumeText
-    { 0x26E8, "16.5 dB" },
+    // { 0x26E8, "16.5 dB" },  calculated
 
     // Zone 2 volume
     { 0x2700, "Infinite" },
-    { 0x2727, "-80 dB" },  
-    /// @todo more values possible, check with Zone2VolumeText
+    // { 0x2727, "-80 dB" },   calculated
     { 0x27C7, "0 dB" },
-    /// @todo more values possible, check with ZoneVolumeText
-    { 0x27E8, "16.5 dB" },
+    // { 0x27E8, "16.5 dB" },  calculated
 
     // DSP effect program
     { 0x2805, "Vienna" },
@@ -661,11 +657,9 @@ static const std::map<uint16_t, const char *> VALS = {
 
     // Zone3 volume
     { 0xA200, "Infinite" },
-    { 0xA227, "-80 dB" },  
-    // TODO more values possible, check with Zone3VolumeText
+    // { 0xA227, "-80 dB" },   calculated
     { 0xA2C7, "0 dB" },
-    // TODO more values possible, check with Zone3VolumeText
-    { 0xA2E8, "16.5 dB" },
+    // { 0xA2E8, "16.5 dB" },  calculated
 
     { 0xA500, "Full" },
     { 0xA501, "-20 dB" },
@@ -744,16 +738,35 @@ const char *RxV1600::report_name(uint8_t id) {
 }
 
 
+const char *RxV1600::display_name(uint8_t id) {
+    auto dsp = TXTS.find(id);
+
+    return (dsp == TXTS.end()) ? NULL : dsp->second;
+}
+
+
 uint8_t RxV1600::report_value(uint8_t id) {
     return _status[id];
 }
 
 
 const char *RxV1600::report_value_string(uint8_t id) {
+    static char buf[10];
+
     uint16_t index = id << 8 | _status[id];
     auto val = VALS.find(index);
 
-    return (val == VALS.end()) ? NULL : val->second;
+    if( val != VALS.end() ) {
+        return val->second;
+    }
+
+    if( id == 0x26 || id == 0x27 || id == 0xa2 ) {
+        float dB = ((float)_status[id] - 0xc7) / 2;
+        snprintf(buf, sizeof(buf), "%.1f dB", dB);
+        return buf;
+    }
+
+    return NULL;
 }
 
 

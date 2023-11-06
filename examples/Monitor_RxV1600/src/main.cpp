@@ -35,13 +35,24 @@ void recvd( const char *resp, void *ctx ) {
             name = rxv.report_name(id);
             value = rxv.report_value_string(id);
             if( !value && (id == 0x26 || id == 0x27 || id == 0xa2) ) {
+                // switch( id ) {
+                //     case 0x26: 
+                //         rxvcomm.send(rxv.command("MainVolumeText"));
+                //         break;
+                //     case 0x27:
+                //         rxvcomm.send(rxv.command("Zone2VolumeText"));
+                //         break;
+                //     case 0xa2:
+                //         rxvcomm.send(rxv.command("Zone3VolumeText"));
+                //         break;
+                // }
                 snprintf(buf, sizeof(buf), "raw %u", rxv.report_value(id));
                 value = buf;
             }
             Serial.printf("Report x%02X: %s = %s\n", id, name ? name : "invalid", value ? value : "invalid");
         }
         else if( rxv.decodeText(resp, id, text) ) {
-            name = rxv.report_name(id);
+            name = rxv.display_name(id);
             Serial.printf("Report x%02X: %s = %s\n", id, name ? name : "invalid", text);
         }
         else {

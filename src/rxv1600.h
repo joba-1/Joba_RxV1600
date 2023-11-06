@@ -42,6 +42,11 @@ class RxV1600 {
     /// @return camel cased name of the report from spec or null if id not known
     static const char *report_name(uint8_t id);
 
+    /// @brief get camel cased display report name from report id (rcmd0,1)
+    /// @param id binary value, i.e. rcmd0,1 = '1','A' -> id = 26
+    /// @return camel cased name of the report from spec or null if id not known
+    static const char *display_name(uint8_t id);
+
 
     /// @brief get last report value of report id
     /// @param id binary value, i.e. rcmd0,1 = '1','A' -> id = 26
