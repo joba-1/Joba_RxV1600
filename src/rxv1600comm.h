@@ -22,9 +22,9 @@ class RxV1600Comm {
     ///        Initialize to 9600 baud 8N1 before calling handle()
     RxV1600Comm(Stream &stream);
 
-    /// @brief trigger sending a command to the receiver
+    /// @brief trigger sending a command to the receiver during next handle()
     /// @param cmd the full command string to send
-    bool send(const char *cmd);
+    void send(const char *cmd);
 
     /// @brief register a function that is called once a request is done
     /// @param cb the callback function
@@ -45,11 +45,11 @@ class RxV1600Comm {
     void respond( bool valid );  // invoke callback and prepare for receiving the next response
 
     Stream &_stream;
-    char _resp[268];    // length of full config response (157) probably enough
-    size_t _pos;        // received chars
     recv_t _cb;
-    void *_ctx;
     const char *_cmd;   // command to send
+    size_t _pos;        // received chars
     unsigned _tries;    // number of send tries
     uint32_t _sent_ms;  // start of current try
+    void *_ctx;         // context by/for the callback implementor
+    char _resp[268];    // length of full config response (157) probably enough
 };

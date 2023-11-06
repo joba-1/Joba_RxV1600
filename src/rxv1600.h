@@ -19,7 +19,7 @@
 class RxV1600 {
     public:
 
-    static const char UNKNOWN_VALUE = '\0xff';
+    static const char UNKNOWN_VALUE = '\xff';
 
     typedef enum guard { G_NONE, G_SYSTEM, G_SETTINGS, G_UNKNOWN=UNKNOWN_VALUE } guard_t;
     typedef enum origin { O_RS232C, O_IR, O_PANEL, O_SYSTEM, O_ENCODER, O_UNKNOWN=UNKNOWN_VALUE } origin_t;
