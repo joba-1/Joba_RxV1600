@@ -129,6 +129,7 @@ const char *main_page() {
         "  <table>\n"
         "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
+        "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
         "  </table>\n"
         " </body>\n"
         "</html>\n";
@@ -486,8 +487,8 @@ void setup() {
     digitalWrite(LED_PIN, HIGH);
 
     char msg[80];
-    snprintf(msg, sizeof(msg), "%s Version %s, WLAN IP is %s", 
-        PROGNAME, VERSION, WiFi.localIP().toString().c_str());
+    snprintf(msg, sizeof(msg), "%s WLAN IP is %s", 
+        HOSTNAME, WiFi.localIP().toString().c_str());
     slog(msg, LOG_NOTICE);
 
     configTime(3600, 3600, NTP_SERVER);  // MEZ/MESZ
