@@ -16,6 +16,9 @@
 
 #include <rxv1600comm.h>
 
+#include <map>
+
+
 class RxV1600 {
     public:
 
@@ -24,7 +27,22 @@ class RxV1600 {
     typedef enum guard { G_NONE, G_SYSTEM, G_SETTINGS, G_UNKNOWN=UNKNOWN_VALUE } guard_t;
     typedef enum origin { O_RS232C, O_IR, O_PANEL, O_SYSTEM, O_ENCODER, O_UNKNOWN=UNKNOWN_VALUE } origin_t;
 
+    typedef struct key1_less_key2 {
+        /// @brief less function for maps with char pointer keys
+        bool operator()( char const *key1, char const *key2 ) const {
+            return strcmp(key1, key2) < 0;
+        }
+    } key1_less_key2_t;
+
+    typedef const std::map<const char *, const char *, key1_less_key2_t> cmds_t;
+    typedef cmds_t::const_iterator cmds_iter_t;
+
     RxV1600();
+
+    /// @brief get iterators for all command names
+    /// @return iterator
+    static cmds_iter_t begin();
+    static cmds_iter_t end();
 
     /// @brief get full command bytes to send for given command name
     /// @param name camel cased command name from spec

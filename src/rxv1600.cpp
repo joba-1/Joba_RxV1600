@@ -13,15 +13,7 @@
 #define DEL "\x7F"
 
 
-struct key1_less_key2 {
-    /// @brief less function for maps with char pointer keys
-    bool operator()( char const *key1, char const *key2 ) const {
-        return strcmp(key1, key2) < 0;
-    }
-};
-
-
-static const std::map<const char *, const char *, key1_less_key2> CMDS = {
+static RxV1600::cmds_t CMDS = {
     // Init communication and request current configuration
     { "Ready",                 DC1 "000" ETX },
 
@@ -202,7 +194,7 @@ static const std::map<const char *, const char *, key1_less_key2> CMDS = {
 };
 
 
-static const std::map<const char *, const char *, key1_less_key2> FMTS = {
+static const std::map<const char *, const char *, RxV1600::key1_less_key2_t> FMTS = {
     // System commands with values
     { "MainVolumeSet",             STX "230%02X" ETX },
     { "Zone2VolumeSet",            STX "231%02X" ETX },
@@ -706,6 +698,16 @@ static const std::map<uint16_t, const char *> TXTS = {
     { 0xF0, "OperationCode" },
     { 0xFF, "Versions" }        // Major,SwHi,SwLo,_,RS232,DSPHi,DSPLo, 
 };
+
+
+RxV1600::cmds_iter_t RxV1600::begin() {
+    return CMDS.cbegin();
+}
+
+
+RxV1600::cmds_iter_t RxV1600::end() {
+    return CMDS.cend();
+}
 
 
 RxV1600::RxV1600() {
