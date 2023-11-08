@@ -51,6 +51,7 @@ char start_time[30];
 
 RxV1600Comm rxvcomm(Serial1);
 RxV1600 rxv;
+auto help = RxV1600::end();
 
 
 void slog(const char *message, uint16_t pri = LOG_INFO) {
@@ -130,6 +131,7 @@ const char *main_page() {
         "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
         "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
+        "   <tr><td>Reset ESP</td><td><a href=\"http://" HOSTNAME "/reset\">Reset</a></td></tr>\n"
         "  </table>\n"
         " </body>\n"
         "</html>\n";
@@ -310,11 +312,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
         }
         else {
             if( strcasecmp("help", msg) == 0 ) {
-                for(auto i = RxV1600::begin(); i != RxV1600::end(); i++ ) {
-                    publish(MQTT_TOPIC "/help", i->first);
-                    slog(i->first);
-                    delay(20);
-                }
+                help = RxV1600::begin();
             }
             else if( strcasecmp("reset", msg) == 0 ) {
                 slog("RESET");
@@ -515,8 +513,20 @@ void setup() {
 
 
 void loop() {
+    static const uint32_t help_delay = 20;
+    static uint32_t prev_help = 0;
+
     rxvcomm.handle();
     handle_mqtt(check_ntptime());
     handle_wifi();
     handle_reboot();
+    if( help != RxV1600::end() ) {
+        uint32_t now = millis();
+        if( now - prev_help > help_delay ) {
+            prev_help = now;
+            publish(MQTT_TOPIC "/help", help->first);
+            slog(help->first);
+            help++;
+        }
+    }
 }
