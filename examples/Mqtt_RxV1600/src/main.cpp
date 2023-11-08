@@ -128,6 +128,18 @@ const char *main_page() {
         "  <h1>" PROGNAME " v" VERSION "</h1>\n"
         "  <p>%s</p>\n"
         "  <table>\n"
+        "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/b-on\"><input type=\"submit\" value=\"B On\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
+        "   </tr>\n"
         "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
         "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
@@ -166,6 +178,42 @@ void setup_webserver() {
     // Index page
     web_server.on("/", [](AsyncWebServerRequest *request) { 
         request->send(200, "text/html", main_page());
+    });
+
+    // Speaker A on
+    web_server.on("/a-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_On");
+        request->redirect("/"); 
+    });
+
+    // Speaker A off
+    web_server.on("/a-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_Off");
+        request->redirect("/"); 
+    });
+
+    // Speaker B on
+    web_server.on("/b-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_On");
+        request->redirect("/"); 
+    });
+
+    // Speaker B off
+    web_server.on("/b-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_Off");
+        request->redirect("/"); 
+    });
+
+    // TV input
+    web_server.on("/tv", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
+        request->redirect("/"); 
+    });
+
+    // Bluetooth input
+    web_server.on("/bt", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Dtv");
+        request->redirect("/"); 
     });
 
     web_server.on("/wipe", HTTP_POST, [](AsyncWebServerRequest *request) {
