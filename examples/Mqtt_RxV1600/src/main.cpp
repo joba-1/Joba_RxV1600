@@ -121,6 +121,7 @@ const char *main_page() {
         "<!doctype html>\n"
         "<html lang=\"en\">\n"
         " <head>\n"
+        "  <style> th, td { padding: 5px; } </style>\n"
         "  <meta charset=\"utf-8\">\n"
         "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
         "  <link href=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEUqYbutnpTMuq/70SQgIef5AAAAVUlEQVQIHWOAAPkvDAyM3+Y7MLA7NV5g4GVqKGCQYWowYTBhapBhMGB04GE4/0X+M8Pxi+6XGS67XzzO8FH+iz/Dl/q/8gx/2S/UM/y/wP6f4T8QAAB3Bx3jhPJqfQAAAABJRU5ErkJggg==\" rel=\"icon\" type=\"image/x-icon\" />\n"
@@ -130,22 +131,18 @@ const char *main_page() {
         "  <h1>" PROGNAME " v" VERSION "</h1>\n"
         "  <p>%s</p>\n"
         "  <table>\n"
-        "   <tr><p></tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
         "   </tr>\n"
-        "   <tr><p></tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/b-on\"><input type=\"submit\" value=\"B On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
         "   </tr>\n"
-        "   <tr><p></tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
         "   </tr>\n"
-        "   <tr><p></tr>\n"
         "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
         "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
@@ -270,9 +267,6 @@ void setup_webserver() {
                 shouldReboot--;
             }
             delayReboot = 100;
-        }
-        else {
-            shouldReboot = 0;
         }
         AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
         response->addHeader("Connection", "close");
