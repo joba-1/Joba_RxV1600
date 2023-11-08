@@ -140,13 +140,17 @@ const char *main_page() {
         "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
         "   </tr>\n"
         "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/mute-on\"><input type=\"submit\" value=\"Mute\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/mute-off\"><input type=\"submit\" value=\"Unmute\"></form></td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
         "   </tr>\n"
         "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
         "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
-        "   <tr><td>Reset ESP</td><td><a href=\"http://" HOSTNAME "/reset\">Reset</a></td></tr>\n"
+        "   <tr><td>ESP</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td></tr>\n"
         "  </table>\n"
         " </body>\n"
         "</html>\n";
@@ -205,6 +209,18 @@ void setup_webserver() {
     // Speaker B off
     web_server.on("/b-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
         mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_Off");
+        request->redirect("/"); 
+    });
+
+    // Mute on
+    web_server.on("/mute-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "Mute_On");
+        request->redirect("/"); 
+    });
+
+    // Mute off
+    web_server.on("/mute-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        mqtt.publish(MQTT_TOPIC "/cmd", "Mute_Off");
         request->redirect("/"); 
     });
 
