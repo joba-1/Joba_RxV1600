@@ -206,13 +206,13 @@ void setup_webserver() {
 
     // TV input
     web_server.on("/tv", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
+        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Dtv");
         request->redirect("/"); 
     });
 
     // Bluetooth input
     web_server.on("/bt", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Dtv");
+        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
         request->redirect("/"); 
     });
 
