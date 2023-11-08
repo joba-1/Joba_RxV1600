@@ -18,7 +18,7 @@ static RxV1600::cmds_t CMDS = {
     { "Ready",                 DC1 "000" ETX },
 
     // Reset config to factory defaults
-    { "Reset",                 DC3 DEL DEL DEL ETX },
+    { "ResetConfig",           DC3 DEL DEL DEL ETX },
 
     // Operation commands (same as IR commands)
     { "MainVolume_Up",         STX "07A1A" ETX },
@@ -809,9 +809,9 @@ bool RxV1600::decodeText( const char *resp, uint8_t &id, char *text ) {
     if( resp[0] != *DC1 || resp[11] != *ETX ) return false;
 
     uint8_t val[2];
-    for( int i=1; i<3; i++) {
-        val[i-1] = nibble(resp[i]);
-        if( val[i-1] == UNKNOWN_VALUE ) return false;
+    for( int i=0; i<sizeof(val); i++) {
+        val[i] = nibble(resp[i+1]);
+        if( val[i] == UNKNOWN_VALUE ) return false;
     }
 
     id = (val[0] << 4) | val[1];

@@ -24,7 +24,8 @@ class RxV1600Comm {
 
     /// @brief trigger sending a command to the receiver during next handle()
     /// @param cmd the full command string to send
-    void send(const char *cmd);
+    /// @return true if no other command is still active
+    bool send(const char *cmd);
 
     /// @brief register a function that is called once a request is done
     /// @param cb the callback function

@@ -303,14 +303,17 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
         snprintf(msg, sizeof(msg), "%.*s", length, (char *)payload);
         const char *cmd = rxv.command(msg);
         if( cmd ) {
-            rxvcomm.send(cmd);
+            if( !rxvcomm.send(cmd) ) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt command '%s'", cmd);
+                slog(msg);
+            }
         }
         else {
             if( strcasecmp("help", msg) == 0 ) {
                 for(auto i = RxV1600::begin(); i != RxV1600::end(); i++ ) {
                     publish(MQTT_TOPIC "/help", i->first);
                     slog(i->first);
-                    delay(10);
+                    delay(20);
                 }
             }
             else if( strcasecmp("reset", msg) == 0 ) {

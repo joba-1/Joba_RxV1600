@@ -11,10 +11,12 @@ RxV1600Comm::RxV1600Comm(Stream &stream) : _stream(stream), _cb(NULL), _cmd(NULL
 }
 
 
-void RxV1600Comm::send(const char *cmd) {
+bool RxV1600Comm::send(const char *cmd) {
+    if( _cmd ) return false;
     _cmd = cmd;
     _pos = 0;
     _tries = 0;
+    return true;
 }
 
 
@@ -36,6 +38,7 @@ void RxV1600Comm::respond( bool valid ) {
 
 void RxV1600Comm::handle() {
     while( _stream.available() ) {
+        _cmd = NULL;
         // RX-V1600 has sent something
         _resp[_pos] = _stream.read();
         if( _resp[_pos++] == '\x03' ) {
