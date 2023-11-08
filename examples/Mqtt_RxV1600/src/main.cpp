@@ -29,7 +29,8 @@
 #define WEBSERVER_PORT 80
 
 AsyncWebServer web_server(WEBSERVER_PORT);
-bool shouldReboot = false;  // after updates...
+uint32_t shouldReboot = 0;  // after updates or timeouts...
+uint32_t delayReboot = 100;  // with a slight delay
 
 
 // publish to mqtt broker
@@ -99,6 +100,7 @@ bool handle_wifi() {
                     digitalWrite(LED_PIN, (i & 1) ? LOW : HIGH);
                     delay(100);
                 }
+                Serial1.end();
                 ESP.restart();
                 while (true)
                     ;
@@ -128,18 +130,22 @@ const char *main_page() {
         "  <h1>" PROGNAME " v" VERSION "</h1>\n"
         "  <p>%s</p>\n"
         "  <table>\n"
+        "   <tr><p></tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
         "   </tr>\n"
+        "   <tr><p></tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/b-on\"><input type=\"submit\" value=\"B On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
         "   </tr>\n"
+        "   <tr><p></tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
         "   </tr>\n"
+        "   <tr><p></tr>\n"
         "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
         "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
@@ -172,6 +178,7 @@ void setup_webserver() {
                         " <body>Resetting...</body>\n"
                         "</html>\n");
         delay(200);
+        Serial1.end();
         ESP.restart();
     });
 
@@ -229,6 +236,7 @@ void setup_webserver() {
                         " <body>Wipe WLAN config. Connect to AP '" HOSTNAME "' and connect to http://192.168.4.1</body>\n"
                         "</html>\n");
         delay(200);
+        Serial1.end();
         ESP.restart();
     });
 
@@ -256,7 +264,16 @@ void setup_webserver() {
     });
 
     web_server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request){
-        shouldReboot = !Update.hasError();
+        if( !Update.hasError() ) {
+            shouldReboot = millis();
+            if( shouldReboot == 0 ) {
+                shouldReboot--;
+            }
+            delayReboot = 100;
+        }
+        else {
+            shouldReboot = 0;
+        }
         AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
         response->addHeader("Connection", "close");
         request->send(response);
@@ -365,6 +382,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
             else if( strcasecmp("reset", msg) == 0 ) {
                 slog("RESET");
                 delay(100);
+                Serial1.end();
                 ESP.restart();
             }
             else {
@@ -415,18 +433,11 @@ bool handle_mqtt( bool time_valid ) {
 
 
 void handle_reboot() {
-    static const int32_t reboot_delay = 1000;  // if should_reboot wait this long in ms
-    static uint32_t start = 0;                 // first detected should_reboot
-
     if (shouldReboot) {
         uint32_t now = millis();
-        if (!start) {
-            start = now;
-        }
-        else {
-            if (now - start > reboot_delay) {
-                ESP.restart();
-            }
+        if (now - shouldReboot > delayReboot) {
+            Serial1.end();
+            ESP.restart();
         }
     }
 }
@@ -494,8 +505,11 @@ void recvd( const char *resp, void *ctx ) {
     else {
         snprintf(msg, sizeof(msg), "TIMEOUT");
         slog(msg);
-        delay(60000);
-        ESP.restart();
+        shouldReboot = millis();
+        if( shouldReboot == 0 ) {
+            shouldReboot--;
+        }
+        delayReboot = 60000;
     }
 }
 
@@ -528,6 +542,7 @@ void setup() {
             digitalWrite(LED_PIN, (i & 1) ? HIGH : LOW);
             delay(100);
         }
+        Serial1.end();
         ESP.restart();
         while (true)
             ;
