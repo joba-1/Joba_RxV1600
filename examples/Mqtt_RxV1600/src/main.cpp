@@ -144,6 +144,10 @@ const char *main_page() {
         "    <td><form method=\"POST\" action=\"/mute-off\"><input type=\"submit\" value=\"Unmute\"></form></td>\n"
         "   </tr>\n"
         "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/vol-up\"><input type=\"submit\" value=\"Vol +\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/vol-down\"><input type=\"submit\" value=\"Vol -\"></form></td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
         "   </tr>\n"
@@ -190,49 +194,61 @@ void setup_webserver() {
 
     // Speaker A on
     web_server.on("/a-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_On");
+        publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_On");
         request->redirect("/"); 
     });
 
     // Speaker A off
     web_server.on("/a-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_Off");
+        publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_Off");
         request->redirect("/"); 
     });
 
     // Speaker B on
     web_server.on("/b-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_On");
+        publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_On");
         request->redirect("/"); 
     });
 
     // Speaker B off
     web_server.on("/b-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_Off");
+        publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_Off");
         request->redirect("/"); 
     });
 
     // Mute on
     web_server.on("/mute-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "Mute_On");
+        publish(MQTT_TOPIC "/cmd", "Mute_On");
         request->redirect("/"); 
     });
 
     // Mute off
     web_server.on("/mute-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "Mute_Off");
+        publish(MQTT_TOPIC "/cmd", "Mute_Off");
+        request->redirect("/"); 
+    });
+
+    // Volume up
+    web_server.on("/vol-up", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        publish(MQTT_TOPIC "/cmd", "MainVolume_Up");
+        request->redirect("/"); 
+    });
+
+    // Volume down
+    web_server.on("/vol-down", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        publish(MQTT_TOPIC "/cmd", "MainVolume_Down");
         request->redirect("/"); 
     });
 
     // TV input
     web_server.on("/tv", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Dtv");
+        publish(MQTT_TOPIC "/cmd", "Input_Dtv");
         request->redirect("/"); 
     });
 
     // Bluetooth input
     web_server.on("/bt", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        mqtt.publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
+        publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
         request->redirect("/"); 
     });
 
