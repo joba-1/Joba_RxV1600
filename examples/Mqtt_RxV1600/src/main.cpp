@@ -114,6 +114,8 @@ bool handle_wifi() {
 
 
 char web_msg[80] = "";  // main web page displays and then clears this
+bool webpage_update = false;  // true if web page changed rxv1600 state -> refresh every 1s until rxv1600 responded
+int first_vol = 0;  // double vol up or down web commands: first changes 0.5dB, following change 1dB
 
 // Standard web page
 const char *main_page() {
@@ -125,7 +127,7 @@ const char *main_page() {
         "  <meta charset=\"utf-8\">\n"
         "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
         "  <link href=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEUqYbutnpTMuq/70SQgIef5AAAAVUlEQVQIHWOAAPkvDAyM3+Y7MLA7NV5g4GVqKGCQYWowYTBhapBhMGB04GE4/0X+M8Pxi+6XGS67XzzO8FH+iz/Dl/q/8gx/2S/UM/y/wP6f4T8QAAB3Bx3jhPJqfQAAAABJRU5ErkJggg==\" rel=\"icon\" type=\"image/x-icon\" />\n"
-        "  <title>" PROGNAME " v" VERSION "</title>\n"
+        "  <title>" PROGNAME " v" VERSION "</title>\n%s"
         " </head>\n"
         " <body>\n"
         "  <h1>" PROGNAME " v" VERSION "</h1>\n"
@@ -134,36 +136,53 @@ const char *main_page() {
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
+        "    <td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/b-on\"><input type=\"submit\" value=\"B On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
+        "    <td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/mute-on\"><input type=\"submit\" value=\"Mute\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/mute-off\"><input type=\"submit\" value=\"Unmute\"></form></td>\n"
+        "    <td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/vol-up\"><input type=\"submit\" value=\"Vol +\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/vol-down\"><input type=\"submit\" value=\"Vol -\"></form></td>\n"
+        "    <td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
+        "    <td>%s</td>\n"
         "   </tr>\n"
-        "   <tr><td>Startzeit</td><td>%s</td></tr>\n"
-        "   <tr><td>Ladezeit</td><td>%s</td></tr>\n"
-        "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
-        "   <tr><td>ESP</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td></tr>\n"
+        "   <tr><td>Startzeit</td><td>%s</td><td></td></tr>\n"
+        "   <tr><td>Ladezeit</td><td>%s</td><td></td></tr>\n"
+        "   <tr><td>Update URL</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td><td></td></tr>\n"
+        "   <tr><td>ESP</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td><td></td></tr>\n"
         "  </table>\n"
         " </body>\n"
         "</html>\n";
     static char page[sizeof(fmt) + 500] = "";
+    const char *speaker_a = rxv.report_value_string(0x2e);
+    const char *speaker_b = rxv.report_value_string(0x2f);
+    const char *muted = rxv.report_value_string(0x23);
+    const char *volume = rxv.report_value_string(0x26);
+    const char *input = rxv.report_value_string(0x21);
+    const char *refresh = webpage_update ? "  <meta http-equiv=\"refresh\" content=\"1; url=/\"> \n" : "";
     static char curr_time[30];
     time_t now;
     time(&now);
-    strftime(curr_time, sizeof(curr_time), "%FT%T", localtime(&now));
-    snprintf(page, sizeof(page), fmt, web_msg, start_time, curr_time);
+    strftime(curr_time, sizeof(curr_time), "%F %T", localtime(&now));
+    snprintf(page, sizeof(page), fmt, refresh, web_msg, 
+        speaker_a ? speaker_a : "unknown",
+        speaker_b ? speaker_b : "unknown",
+        muted ? muted : "unknown",
+        volume ? volume : "unknown",
+        input ? input : "unknown",
+        start_time, curr_time);
     *web_msg = '\0';
     return page;
 }
@@ -195,59 +214,71 @@ void setup_webserver() {
     // Speaker A on
     web_server.on("/a-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_On");
+        webpage_update = true;
         request->redirect("/"); 
     });
 
     // Speaker A off
     web_server.on("/a-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_Off");
+        webpage_update = true;
         request->redirect("/"); 
     });
 
     // Speaker B on
     web_server.on("/b-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_On");
         request->redirect("/"); 
     });
 
     // Speaker B off
     web_server.on("/b-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_Off");
         request->redirect("/"); 
     });
 
     // Mute on
     web_server.on("/mute-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Mute_On");
         request->redirect("/"); 
     });
 
     // Mute off
     web_server.on("/mute-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Mute_Off");
         request->redirect("/"); 
     });
 
     // Volume up
     web_server.on("/vol-up", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
+        first_vol = 1;
         publish(MQTT_TOPIC "/cmd", "MainVolume_Up");
         request->redirect("/"); 
     });
 
     // Volume down
     web_server.on("/vol-down", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
+        first_vol = -1;
         publish(MQTT_TOPIC "/cmd", "MainVolume_Down");
         request->redirect("/"); 
     });
 
     // TV input
     web_server.on("/tv", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Input_Dtv");
         request->redirect("/"); 
     });
 
     // Bluetooth input
     web_server.on("/bt", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
         request->redirect("/"); 
     });
@@ -298,7 +329,7 @@ void setup_webserver() {
             if( shouldReboot == 0 ) {
                 shouldReboot--;
             }
-            delayReboot = 100;
+            delayReboot = 10000;
         }
         AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
         response->addHeader("Connection", "close");
@@ -354,7 +385,7 @@ bool check_ntptime() {
     if (!have_time && valid_time) {
         have_time = true;
         time_t now = time(NULL);
-        strftime(start_time, sizeof(start_time), "%FT%T", localtime(&now));
+        strftime(start_time, sizeof(start_time), "%F %T", localtime(&now));
         snprintf(msg, sizeof(msg), "Got valid time at %s", start_time);
         slog(msg, LOG_NOTICE);
         if (mqtt.connected()) {
@@ -479,6 +510,8 @@ void recvd( const char *resp, void *ctx ) {
     const char *value;
     char buf[10];
 
+    webpage_update = false;
+
     if( resp ) {
         if( rxv.decodeConfig(resp, power) ) {
             snprintf(msg, sizeof(msg), "Got config while power is %s", power ? "on" : "off");
@@ -501,6 +534,7 @@ void recvd( const char *resp, void *ctx ) {
                 snprintf(msg, sizeof(msg), "Guard for report x%02X is %s", id, guard == RxV1600::G_SETTINGS ? "Settings" : "System");
                 slog(msg);
             }
+
             name = rxv.report_name(id);
             value = rxv.report_value_string(id);
             if( !value && (id == 0x26 || id == 0x27 || id == 0xa2) ) {
@@ -509,9 +543,19 @@ void recvd( const char *resp, void *ctx ) {
             }
             snprintf(msg, sizeof(msg), "Report x%02X: %s = %s", id, name ? name : "invalid", value ? value : "invalid");
             slog(msg);
-            if( name ) {
+
+            if( id == 0x26 && first_vol != 0 ) {
+                if( first_vol > 0 ) {
+                    rxvcomm.send(rxv.command("MainVolume_Up"));
+                }
+                else {
+                    rxvcomm.send(rxv.command("MainVolume_Down"));
+                }
+                first_vol = 0;
+            }
+            else if( name ) {
                 snprintf(msg, sizeof(msg), MQTT_TOPIC "/status/%s", name);
-                mqtt.publish(msg, value);
+                publish(msg, value);
             }
         }
         else if( rxv.decodeText(resp, id, text) ) {
