@@ -27,6 +27,9 @@ void RxV1600Comm::on_recv(recv_t cb, void *ctx) {
 
 
 void RxV1600Comm::respond( bool valid ) {
+    if( !valid ) _resp[_pos] = '\0';
+    Serial.printf("DEBUG: recv '%s'\n", _resp);
+
     _cmd = NULL;  // stop resending current command
     _pos = 0;     // reset response pointer
     if( _cb ) {
@@ -65,6 +68,7 @@ void RxV1600Comm::handle() {
                 // start timeout and send the command
                 _sent_ms = now;
                 _stream.print(_cmd);
+                Serial.printf("DEBUG: sent '%s'\n", _cmd);
             }
         }
     }
