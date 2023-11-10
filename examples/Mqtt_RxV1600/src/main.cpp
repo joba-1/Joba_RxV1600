@@ -350,7 +350,7 @@ void setup_webserver() {
             if( shouldReboot == 0 ) {
                 shouldReboot--;
             }
-            delayReboot = 10000;
+            delayReboot = 5000;
         }
         AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
         response->addHeader("Connection", "close");
@@ -565,6 +565,20 @@ void recvd( const char *resp, void *ctx ) {
             snprintf(msg, sizeof(msg), "Report x%02X: %s = %s", id, name ? name : "invalid", value ? value : "invalid");
             slog(msg);
 
+            // "Speaker A Relay" only switches front left and right
+            // Also silence center and back by switching to 2ch stereo effect
+            if( id == 0x2E ) {
+                // Speaker A Relais
+                if( rxv.report_value(id) == 0x00 ) {  // Off
+                    rxvcomm.send(rxv.command("DSP_2chStereo"));
+                }
+                else {  // On
+                    rxvcomm.send(rxv.command("DSP_Adventure"));
+                }
+            }
+
+            // Vol change is slow, and first request since 1s only reports current value
+            // Double request: so first changes by 0.5dB and further changes by 1dB 
             if( id == 0x26 && first_vol != 0 ) {
                 if( first_vol > 0 ) {
                     rxvcomm.send(rxv.command("MainVolume_Up"));
