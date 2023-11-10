@@ -178,10 +178,10 @@ const char *main_page() {
         "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
         "    <td>%s</td>\n"
         "   </tr>\n"
-        "   <tr><td>Startzeit</td><td>%s</td><td></td></tr>\n"
-        "   <tr><td>Ladezeit</td><td>%s</td><td></td></tr>\n"
-        "   <tr><td>Version</td><td>" VERSION " %s " __TIME__ "</td><td><a href=\"http://" HOSTNAME "/update\">Update</a></td></tr>\n"
-        "   <tr><td>ESP</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td><td></td></tr>\n"
+        "   <tr><td>Ladezeit</td><td>%s</td><td><form method=\"GET\" action=\"/\"><input type=\"submit\" value=\"Reload\"></form></td></tr>\n"
+        "   <tr><td>Startzeit</td><td>%s</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td></tr>\n"
+        "   <tr><td>Compiled</td><td>%s " __TIME__ "</td><td><form method=\"GET\" action=\"/update\"><input type=\"submit\" value=\"Update\"></form></td></tr>\n"
+        "   <tr><td><small>Author</small></td><td><small>Joachim Banzhaf</small></td><td><a href=\"https://github.com/joba-1\" target=\"_blank\"><small>Github</small></a></td></tr>\n"
         "  </table>\n"
         " </body>\n"
         "</html>\n";
@@ -202,7 +202,7 @@ const char *main_page() {
         muted ? muted : "unknown",
         volume ? volume : "unknown",
         input ? input : "unknown",
-        start_time, curr_time, IsoDate);
+        curr_time, start_time, IsoDate);
     *web_msg = '\0';
     return page;
 }
