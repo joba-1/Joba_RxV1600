@@ -1,4 +1,5 @@
-/// Print RX-V1600 configuration and status changes as text
+// Mqtt serial gateway for Yamaha RX-V1600 AV Receiver
+// Also allow some RX-V1600 status changes via web page (e.g. Vol+/-)
 
 #include <Arduino.h>
 
@@ -181,7 +182,7 @@ const char *main_page() {
         "   <tr><td>Ladezeit</td><td>%s</td><td><form method=\"GET\" action=\"/\"><input type=\"submit\" value=\"Reload\"></form></td></tr>\n"
         "   <tr><td>Startzeit</td><td>%s</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td></tr>\n"
         "   <tr><td>Compiled</td><td>%s " __TIME__ "</td><td><form method=\"GET\" action=\"/update\"><input type=\"submit\" value=\"Update\"></form></td></tr>\n"
-        "   <tr><td><small>Author</small></td><td><small>Joachim Banzhaf</small></td><td><a href=\"https://github.com/joba-1\" target=\"_blank\"><small>Github</small></a></td></tr>\n"
+        "   <tr><td><small>Author</small></td><td><small>Joachim Banzhaf</small></td><td><a href=\"https://github.com/joba-1/Joba_RxV1600\" target=\"_blank\"><small>Github</small></a></td></tr>\n"
         "  </table>\n"
         " </body>\n"
         "</html>\n";
