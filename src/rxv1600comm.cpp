@@ -40,6 +40,10 @@ void RxV1600Comm::respond( bool valid ) {
 
 
 void RxV1600Comm::handle() {
+    static const uint32_t comm_delay = 50;  // min delay before sending after receiving data 
+    static uint32_t last_comm = 0;
+    uint32_t now = millis();
+
     while( _stream.available() ) {
         _cmd = NULL;
         // RX-V1600 has sent something
@@ -53,11 +57,15 @@ void RxV1600Comm::handle() {
             // discard oversized response
             respond(false);
         }
+        last_comm = (now - 1) | 1;
     }
 
-    if( _cmd ) {
+    if( last_comm && now - last_comm > comm_delay ) {
+        last_comm = 0;
+    }
+
+    if( !last_comm && _cmd ) {
         // command request ongoing
-        uint32_t now = millis();
         if( !_tries || now - _sent_ms > TIMEOUT_MS ) {
             // command should be sent
             if( ++_tries > MAX_TRIES ) {
@@ -68,6 +76,7 @@ void RxV1600Comm::handle() {
                 // start timeout and send the command
                 _sent_ms = now;
                 _stream.print(_cmd);
+                last_comm = (now - 1) | 1;
                 Serial.printf("DEBUG: sent '%s'\n", _cmd);
             }
         }
