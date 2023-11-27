@@ -5,6 +5,7 @@
 
 
 #define LED_PIN LED_BUILTIN
+#define BTN_PIN 26
 
 
 // Infrastructure
@@ -619,6 +620,48 @@ void recvd( const char *resp, void *ctx ) {
 }
 
 
+void pin_changed( bool is_high ) {
+    if( is_high ) {
+        // My pico-w signals a BT connection. Switch receiver to its bluetooth input port
+        rxvcomm.send(rxv.command("Input_Cbl-Sat"));
+    }
+    else {
+        // My pico-w signals BT connection lost. Switch receiver to its tv input port
+        rxvcomm.send(rxv.command("Input_Dtv"));
+    }
+}
+
+
+void handle_pin() {
+    static const uint32_t debounce_ms = 10;
+
+    static uint32_t changed = 0;
+    static bool was_high = false;
+
+    bool is_high = digitalRead(BTN_PIN) != LOW;
+    if( is_high != was_high ) {
+        // pin state has changed
+        uint32_t now = millis();
+        if( !changed ) {
+            // first time we notice the change: start debounce timer
+            changed = (now - 1) | 1;
+        }
+        else {
+            // waiting for debounce of pin state
+            if( now - changed > debounce_ms ) {
+                // debounced: react on pin change
+                pin_changed(is_high);
+                was_high = is_high;  // remember last known state
+            }
+        }
+    }
+    else {
+        // pin state not changed or changed back within debounce period.
+        changed = 0;  // reset debounce timer
+    }
+}
+
+
 void setup() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, HIGH);
@@ -676,16 +719,19 @@ void setup() {
     rxvcomm.send(rxv.command("Ready"));
     Serial.println("Sent Ready message");
 
+    pinMode(BTN_PIN, INPUT_PULLDOWN);  // on toggle switch rxv1600 input 
+
     digitalWrite(LED_PIN, LOW);
 }
 
 
 void loop() {
-    static const uint32_t help_delay = 20;
+    static const uint32_t help_delay = 10;
     static uint32_t prev_help = 0;
 
     rxvcomm.handle();
     handle_mqtt(check_ntptime());
+    handle_pin();
     handle_wifi();
     handle_reboot();
     if( help != RxV1600::end() ) {

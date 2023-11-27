@@ -4,15 +4,6 @@
 #include <string.h>
 
 
-// ASCII control characters used by the protocol
-#define STX "\x02"
-#define ETX "\x03"
-#define DC1 "\x11"
-#define DC2 "\x12"
-#define DC3 "\x13"
-#define DEL "\x7F"
-
-
 static RxV1600::cmds_t CMDS = {
     // Init communication and request current configuration
     { "Ready",                 DC1 "000" ETX },

@@ -2,6 +2,15 @@
 
 #include <Stream.h>
 
+// ASCII control characters used by the protocol
+#define STX "\x02"
+#define ETX "\x03"
+#define DC1 "\x11"
+#define DC2 "\x12"
+#define DC3 "\x13"
+#define DEL "\x7F"
+
+
 /// Class to send commands to an RX-V1600 and receive its messages
 /// Each sent command triggers at least one callback.
 /// Since the RX-V1600 sends two responses for some commands and messages on status changes

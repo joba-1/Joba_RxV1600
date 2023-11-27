@@ -27,7 +27,7 @@ void RxV1600Comm::on_recv(recv_t cb, void *ctx) {
 
 
 void RxV1600Comm::respond( bool valid ) {
-    if( !valid ) _resp[_pos] = '\0';
+    _resp[_pos] = '\0';
     Serial.printf("DEBUG: recv '%s'\n", _resp);
 
     _cmd = NULL;  // stop resending current command
@@ -48,9 +48,12 @@ void RxV1600Comm::handle() {
         _cmd = NULL;
         // RX-V1600 has sent something
         _resp[_pos] = _stream.read();
-        if( _resp[_pos++] == '\x03' ) {
+        if( _pos == 0 && (*_resp != *STX && *_resp != *DC1 && *_resp != *DC2 && *_resp != *DC3) ) {
+            // not the start of a response
+            *_resp = '\0';
+        }
+        else if( _resp[_pos++] == '\x03' ) {
             // this was the last char of a response
-            _resp[_pos] = '\0';  // terminate the response string
             respond(true);
         }
         else if( _pos == sizeof(_resp) - 1 ) {
