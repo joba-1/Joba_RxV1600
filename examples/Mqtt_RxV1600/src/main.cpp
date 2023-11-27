@@ -156,6 +156,11 @@ const char *main_page() {
         "  <p>%s</p>\n"
         "  <table>\n"
         "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/power-on\"><input type=\"submit\" value=\"Main On\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/power-off\"><input disabled type=\"submit\" value=\"Main Off\"></form></td>\n"
+        "    <td>%8.8s</td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
         "    <td>%s</td>\n"
@@ -188,6 +193,7 @@ const char *main_page() {
         " </body>\n"
         "</html>\n";
     static char page[sizeof(fmt) + 500] = "";
+    const char *power = rxv.report_value_string(0x20);
     const char *speaker_a = rxv.report_value_string(0x2e);
     const char *speaker_b = rxv.report_value_string(0x2f);
     const char *muted = rxv.report_value_string(0x23);
@@ -199,6 +205,7 @@ const char *main_page() {
     time(&now);
     strftime(curr_time, sizeof(curr_time), "%F %T", localtime(&now));
     snprintf(page, sizeof(page), fmt, refresh, web_msg, 
+        power ? power : "unknown",
         speaker_a ? speaker_a : "unknown",
         speaker_b ? speaker_b : "unknown",
         muted ? muted : "unknown",
@@ -231,6 +238,20 @@ void setup_webserver() {
     // Index page
     web_server.on("/", [](AsyncWebServerRequest *request) { 
         request->send(200, "text/html", main_page());
+    });
+
+    // Power on
+    web_server.on("/power-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        publish(MQTT_TOPIC "/cmd", "MainZonePower_On");
+        webpage_update = true;
+        request->redirect("/"); 
+    });
+
+    // Power off
+    web_server.on("/power-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        publish(MQTT_TOPIC "/cmd", "MainZonePower_Off");
+        webpage_update = true;
+        request->redirect("/"); 
     });
 
     // Speaker A on
