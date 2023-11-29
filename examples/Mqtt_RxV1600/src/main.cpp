@@ -157,7 +157,7 @@ const char *main_page() {
         "  <table>\n"
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/power-on\"><input type=\"submit\" value=\"Main On\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/power-off\"><input disabled type=\"submit\" value=\"Main Off\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/power-off\"><input type=\"submit\" value=\"Main Off\"></form></td>\n"
         "    <td>%8.8s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
@@ -641,28 +641,58 @@ void recvd( const char *resp, void *ctx ) {
 }
 
 
-void pin_changed( bool is_high ) {
+const char *pin_changed( bool is_high ) {
+    static bool bt_has_powered_on = false;
+
+    bool power = false;
+    switch( rxv.report_value(0x20) ) {
+        case 1:
+        case 2:
+        case 4:
+        case 5:
+            power = true;
+    };
+
     if( is_high ) {
         // My pico-w signals a BT connection. Switch receiver to its bluetooth input port
-        rxvcomm.send(rxv.command("Input_Cbl-Sat"));
+        const char *cmd = rxv.command("Input_Cbl-Sat");
+        if( !power ) {
+            rxvcomm.send(rxv.command("MainZonePower_On"));
+            bt_has_powered_on = true;
+            return cmd;  // call this later...
+        }
+        else {
+            bt_has_powered_on = false;
+            rxvcomm.send(cmd);
+        }
     }
     else {
         // My pico-w signals BT connection lost. Switch receiver to its tv input port
         rxvcomm.send(rxv.command("Input_Dtv"));
+        if( bt_has_powered_on ) {
+            bt_has_powered_on = false;
+            return rxv.command("MainZonePower_Off");
+        }
     }
+
+    return NULL;
 }
 
 
 void handle_pin() {
     static const uint32_t debounce_ms = 10;
+    static const uint32_t powered_ms = 5000;
+
+    static const char *cmd = NULL;
+    static uint32_t power_at = 0;
 
     static uint32_t changed = 0;
     static bool was_high = false;
 
+    uint32_t now = millis();
     bool is_high = digitalRead(BTN_PIN) != LOW;
     if( is_high != was_high ) {
         // pin state has changed
-        uint32_t now = millis();
         if( !changed ) {
             // first time we notice the change: start debounce timer
             changed = (now - 1) | 1;
@@ -671,7 +701,10 @@ void handle_pin() {
             // waiting for debounce of pin state
             if( now - changed > debounce_ms ) {
                 // debounced: react on pin change
-                pin_changed(is_high);
+                cmd = pin_changed(is_high);
+                if( cmd ) {
+                    power_at = (now - 1) | 1;
+                }
                 was_high = is_high;  // remember last known state
             }
         }
@@ -679,6 +712,11 @@ void handle_pin() {
     else {
         // pin state not changed or changed back within debounce period.
         changed = 0;  // reset debounce timer
+        if( cmd && power_at && now - power_at > powered_ms ) {
+            rxvcomm.send(cmd);
+            power_at = 0;
+            cmd = NULL;
+        } 
     }
 }
 
