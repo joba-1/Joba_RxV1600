@@ -37,6 +37,7 @@ uint32_t delayReboot = 100;  // with a slight delay
 
 // publish to mqtt broker
 #include <PubSubClient.h>
+#include <cstring>
 
 WiFiClient wifiMqtt;
 PubSubClient mqtt(wifiMqtt);
@@ -468,7 +469,39 @@ void print_reset_reason(int core) {
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     if (strcasecmp(MQTT_TOPIC "/cmd", topic) == 0) {
         snprintf(msg, sizeof(msg), "%.*s", length, (char *)payload);
-        const char *cmd = rxv.command(msg);
+
+        char *cmd_name = std::strtok(msg, ",");
+        char *cmd_value = std::strtok(NULL, ",");
+        bool cmd_excess = (std::strtok(NULL, ",") != NULL);
+        const char *cmd = NULL;
+
+        if( cmd_value ) {
+            if( cmd_excess ) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt payload '%.*s': excess argument", length, (char *)payload);
+                slog(msg);
+                return;
+            }
+            size_t value_len = strlen(cmd_value);
+            char *endp;
+            unsigned long value = strtoul(cmd_value, &endp, 0);
+            if( endp != &cmd_value[value_len] ) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt payload '%.*s': excess value", length, (char *)payload);
+                slog(msg);
+                return;
+            }
+            else if( value > 0xff ) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt payload '%.*s': value overflow", length, (char *)payload);
+                slog(msg);
+                return;
+            }
+            else {
+                cmd = rxv.command_value(cmd_name, value);
+            }
+        }
+        else {
+            cmd = rxv.command(msg);
+        }
+
         if( cmd ) {
             if( !rxvcomm.send(cmd) ) {
                 snprintf(msg, sizeof(msg), "Discarding mqtt command '%s'", cmd);
