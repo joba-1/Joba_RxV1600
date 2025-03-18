@@ -162,6 +162,11 @@ const char *main_page() {
         "    <td>%8.8s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
+        "    <td>%s</td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
         "    <td>%s</td>\n"
@@ -177,29 +182,60 @@ const char *main_page() {
         "    <td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/vol-up\"><input type=\"submit\" value=\"Vol +\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/vol-down\"><input type=\"submit\" value=\"Vol -\"></form></td>\n"
-        "    <td>%s</td>\n"
+        "    <td><form method=\"POST\" action=\"/vol-up\"><input type=\"submit\" value=\"Vol +\"></form></td>\n"
+        "    <td id=\"value\">%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" value=\"TV\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
-        "    <td>%s</td>\n"
+        "    <td colspan=\"3\"><input id=\"slider\" style=\"width: 100%%;\" type=\"range\" min=\"-40\" max=\"-10\" value=\"%d\"></td>\n"
         "   </tr>\n"
         "   <tr><td>Ladezeit</td><td>%s</td><td><form method=\"GET\" action=\"/\"><input type=\"submit\" value=\"Reload\"></form></td></tr>\n"
         "   <tr><td>Startzeit</td><td>%s</td><td><form method=\"POST\" action=\"/reset\"><input type=\"submit\" value=\"Reset\"></form></td></tr>\n"
         "   <tr><td>Compiled</td><td>%s " __TIME__ "</td><td><form method=\"GET\" action=\"/update\"><input type=\"submit\" value=\"Update\"></form></td></tr>\n"
         "   <tr><td><small>Author</small></td><td><small>Joachim Banzhaf</small></td><td><a href=\"https://github.com/joba-1/Joba_RxV1600\" target=\"_blank\"><small>Github</small></a></td></tr>\n"
         "  </table>\n"
+        "  <script>\n"
+        "   function ajax(url, data, on_response) {\n"
+        "    q = new XMLHttpRequest();\n"
+        "    q.onreadystatechange = function() {\n"
+        "     if (q.readyState == 4) {\n"
+        "      on_response();\n"
+        "     }\n"
+        "    }\n"
+        "    q.open('POST', url);\n"
+        "    q.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');\n"
+        "    q.send(data);\n"
+        "   }\n"        
+        "   function sliderCallback(sliderId, valueId, callbackUrl) {\n"
+        "    var slider = document.getElementById(sliderId);\n"
+        "    var value = document.getElementById(valueId);\n"
+        "    slider.oninput = function() {\n"
+        "     value.innerHTML = this.value + '.0 dB';\n"
+        "     if (!this.hasAttribute('data-busy')) {\n"
+        "      this.setAttribute('data-busy', '');\n"
+        "      ajax(callbackUrl, sliderId + '=' + this.value, function() {\n"
+        "       slider.removeAttribute('data-busy');\n" 
+        "      })"
+        "     }\n"
+        "    }\n"
+        "    slider.onchange = function() {\n"
+        "      ajax(callbackUrl, sliderId + '=' + this.value, function() {\n"
+        "       slider.removeAttribute('data-busy');\n" 
+        "      })"
+        "    }\n"
+        "   }\n"
+        "   sliderCallback('slider', 'value', '/vol');\n"
+        "  </script>\n"
         " </body>\n"
         "</html>\n";
     static char page[sizeof(fmt) + 500] = "";
     const char *power = rxv.report_value_string(0x20);
+    const char *input = rxv.report_value_string(0x21);
     const char *speaker_a = rxv.report_value_string(0x2e);
     const char *speaker_b = rxv.report_value_string(0x2f);
     const char *muted = rxv.report_value_string(0x23);
     const char *volume = rxv.report_value_string(0x26);
-    const char *input = rxv.report_value_string(0x21);
+    int vol_db = volume ? atoi(volume) : 0;
     const char *refresh = webpage_update ? "  <meta http-equiv=\"refresh\" content=\"1; url=/\"> \n" : "";
     static char curr_time[30];
     time_t now;
@@ -207,12 +243,12 @@ const char *main_page() {
     strftime(curr_time, sizeof(curr_time), "%F %T", localtime(&now));
     snprintf(page, sizeof(page), fmt, refresh, web_msg, 
         power ? power : "unknown",
+        input ? input : "unknown",
         speaker_a ? speaker_a : "unknown",
         speaker_b ? speaker_b : "unknown",
         muted ? muted : "unknown",
         volume ? volume : "unknown",
-        input ? input : "unknown",
-        curr_time, start_time, IsoDate);
+        vol_db, curr_time, start_time, IsoDate);
     *web_msg = '\0';
     return page;
 }
@@ -310,6 +346,20 @@ void setup_webserver() {
         webpage_update = true;
         first_vol = -1;
         publish(MQTT_TOPIC "/cmd", "MainVolume_Down");
+        request->redirect("/"); 
+    });
+
+    // Set volume
+    web_server.on("/vol", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
+        String arg = request->arg("slider");
+        if (!arg.isEmpty()) {
+            int volume = atoi(arg.c_str());
+            char cmd[30];
+            snprintf(cmd, sizeof(cmd), "MainVolumeSet,%d", volume * 2 + 199); 
+            // slog("Set volume to %d", volume);
+            publish(MQTT_TOPIC "/cmd", cmd);
+        }
         request->redirect("/"); 
     });
 
