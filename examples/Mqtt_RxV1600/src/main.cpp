@@ -136,6 +136,13 @@ bool handle_wifi() {
 }
 
 
+const char* afterLastSpace(const char* s) {
+    if (!s) return nullptr;
+    const char* p = strrchr(s, ' ');
+    return p ? p + 1 : s;
+}
+
+
 char web_msg[80] = "";  // main web page displays and then clears this
 bool webpage_update = false;  // true if web page changed rxv1600 state -> refresh every 1s until rxv1600 responded
 int first_vol = 0;  // double vol up or down web commands: first changes 0.5dB, following change 1dB
@@ -178,6 +185,11 @@ const char *main_page() {
         "   <tr>\n"
         "    <td><form method=\"POST\" action=\"/b-on\"><input type=\"submit\" value=\"B On\"></form></td>\n"
         "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
+        "    <td>&nbsp;</td><td>%s</td>\n"
+        "   </tr>\n"
+        "   <tr>\n"
+        "    <td><form method=\"POST\" action=\"/day\"><input type=\"submit\" value=\"Day\"></form></td>\n"
+        "    <td><form method=\"POST\" action=\"/night\"><input type=\"submit\" value=\"Night\"></form></td>\n"
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
@@ -233,13 +245,17 @@ const char *main_page() {
         " </body>\n"
         "</html>\n";
     static char page[sizeof(fmt) + 500] = "";
+    static const char *unknown = "unknown";
     const char *power = rxv.report_value_string(0x20);
     const char *input = rxv.report_value_string(0x21);
-    const char *pch = input;
-    while (*pch && *pch != ' ') pch++;
-    if (*pch == ' ') input = ++pch;  // skip first word (MultiChannel)
+    if (input) {
+        const char *pch = input;
+        while (*pch && *pch != ' ') pch++;
+        if (*pch == ' ') input = ++pch;  // skip first word (MultiChannel)
+    }
     const char *speaker_a = rxv.report_value_string(0x2e);
     const char *speaker_b = rxv.report_value_string(0x2f);
+    const char *night_mode = afterLastSpace(rxv.report_value_string(0x8B));
     const char *muted = rxv.report_value_string(0x23);
     const char *volume = rxv.report_value_string(0x26);
     int vol_db = volume ? atoi(volume) : 0;
@@ -249,12 +265,13 @@ const char *main_page() {
     time(&now);
     strftime(curr_time, sizeof(curr_time), "%F %T", localtime(&now));
     snprintf(page, sizeof(page), fmt, refresh, web_msg, 
-        power ? power : "unknown",
-        input ? input : "unknown",
-        speaker_a ? speaker_a : "unknown",
-        speaker_b ? speaker_b : "unknown",
-        muted ? muted : "unknown",
-        volume ? volume : "unknown",
+        power ? power : unknown,
+        input ? input : unknown,
+        speaker_a ? speaker_a : unknown,
+        speaker_b ? speaker_b : unknown,
+        night_mode ? night_mode : unknown,
+        muted ? muted : unknown,
+        volume ? volume : unknown,
         vol_db, curr_time, start_time, IsoDate);
     *web_msg = '\0';
     return page;
@@ -326,10 +343,32 @@ void setup_webserver() {
         request->redirect("/"); 
     });
 
-    // Mute on
-    web_server.on("/mute-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+    // Night Mode off
+    web_server.on("/day", HTTP_POST, [](AsyncWebServerRequest *request) { 
         webpage_update = true;
-        publish(MQTT_TOPIC "/cmd", "Mute_On");
+        publish(MQTT_TOPIC "/cmd", "NightMode_Off");
+        request->redirect("/"); 
+    });
+
+    // Night Modes cycle
+    web_server.on("/night", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        webpage_update = true;
+        const char *mode;
+        uint8_t current_mode = rxv.report_value(0x8b);
+        switch(current_mode) {
+            case 0x10:
+            case 0x20:
+                mode = "NightMode_CinemaMid";
+                break;
+            case 0x11:
+            case 0x21:
+                mode = "NightMode_CinemaHigh";
+                break;
+            default:
+                mode = "NightMode_CinemaLow";
+                break;
+        }
+        publish(MQTT_TOPIC "/cmd", mode);
         request->redirect("/"); 
     });
 
