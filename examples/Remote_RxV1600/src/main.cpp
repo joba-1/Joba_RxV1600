@@ -15,6 +15,7 @@
 
 // Web server
 #include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 
@@ -736,6 +737,11 @@ void setup() {
     snprintf(msg, sizeof(msg), "%s WLAN IP is %s",
         HOSTNAME, WiFi.localIP().toString().c_str());
     slog(msg, LOG_NOTICE);
+
+    if (MDNS.begin(WiFi.getHostname())) {
+        MDNS.addService("http", "tcp", 80);
+        slog("mDNS started", LOG_NOTICE);
+    }
 
     configTime(3600, 3600, NTP_SERVER);
 
