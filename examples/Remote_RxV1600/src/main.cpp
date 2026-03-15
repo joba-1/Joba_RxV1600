@@ -174,6 +174,7 @@ button{flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:.9em;fon
  cursor:pointer;color:#fff;background:#3a506b;-webkit-tap-highlight-color:transparent}
 button:active{opacity:.7}
 .on{background:#2d6a4f}.off{background:#9b2226}
+.act{box-shadow:0 0 0 3px #a0c4ff;transform:scale(1.04)}
 .vv{text-align:center;font-size:2.2em;font-weight:700;color:#a0c4ff;margin:8px 0;
  font-variant-numeric:tabular-nums}
 .vs{width:100%;height:48px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;margin:4px 0}
@@ -196,38 +197,38 @@ button:active{opacity:.7}
 
 <div class="hdr"><span>Power</span><em id="st-power"></em></div>
 <div class="row">
- <button class="on" onclick="cmd('/power-on')">On</button>
- <button class="off" onclick="cmd('/power-off')">Off</button>
+ <button id="b-pon" class="on" onclick="cmd('/power-on')">On</button>
+ <button id="b-poff" class="off" onclick="cmd('/power-off')">Off</button>
 </div>
 
 <div class="hdr"><span>Input</span><em id="st-input"></em></div>
 <div class="row">
- <button onclick="cmd('/tv')">TV</button>
- <button onclick="cmd('/bt')">Bluetooth</button>
+ <button id="b-tv" onclick="cmd('/tv')">TV</button>
+ <button id="b-bt" onclick="cmd('/bt')">Bluetooth</button>
 </div>
 
 <div class="hdr"><span>Speaker A</span><em id="st-spkA"></em></div>
 <div class="row">
- <button class="on" onclick="cmd('/a-on')">On</button>
- <button class="off" onclick="cmd('/a-off')">Off</button>
+ <button id="b-aon" class="on" onclick="cmd('/a-on')">On</button>
+ <button id="b-aoff" class="off" onclick="cmd('/a-off')">Off</button>
 </div>
 
 <div class="hdr"><span>Speaker B</span><em id="st-spkB"></em></div>
 <div class="row">
- <button class="on" onclick="cmd('/b-on')">On</button>
- <button class="off" onclick="cmd('/b-off')">Off</button>
+ <button id="b-bon" class="on" onclick="cmd('/b-on')">On</button>
+ <button id="b-boff" class="off" onclick="cmd('/b-off')">Off</button>
 </div>
 
 <div class="hdr"><span>Night</span><em id="st-night"></em></div>
 <div class="row">
- <button class="on" onclick="cmd('/day')">Day</button>
- <button class="off" onclick="cmd('/night')">Night</button>
+ <button id="b-day" class="on" onclick="cmd('/day')">Day</button>
+ <button id="b-ngt" class="off" onclick="cmd('/night')">Night</button>
 </div>
 
 <div class="hdr"><span>Mute</span><em id="st-mute"></em></div>
 <div class="row">
- <button class="on" onclick="cmd('/mute-off')">Unmute</button>
- <button class="off" onclick="cmd('/mute-on')">Mute</button>
+ <button id="b-umut" class="on" onclick="cmd('/mute-off')">Unmute</button>
+ <button id="b-mut" class="off" onclick="cmd('/mute-on')">Mute</button>
 </div>
 
 <div class="vv" id="vol-value">-- dB</div>
@@ -284,6 +285,14 @@ function poll(){
   document.getElementById('st-spkB').textContent=s.spkB;
   document.getElementById('st-night').textContent=s.night;
   document.getElementById('st-mute').textContent=s.mute;
+  function hi(a,b,v){var x=document.getElementById(a),y=document.getElementById(b);
+   x.classList.toggle('act',v);y.classList.toggle('act',!v)}
+  hi('b-pon','b-poff',/Main On/.test(s.power));
+  hi('b-tv','b-bt',s.input==='Dtv'||s.input==='TV');
+  hi('b-aon','b-aoff',s.spkA==='On');
+  hi('b-bon','b-boff',s.spkB==='On');
+  hi('b-day','b-ngt',s.night==='Off');
+  hi('b-umut','b-mut',s.mute==='Off');
   if(s.volDb>-999){
    document.getElementById('vol-value').textContent=s.volume;
    if(!slBusy)sl.value=s.volDb;
