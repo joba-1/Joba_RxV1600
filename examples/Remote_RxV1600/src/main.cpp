@@ -158,177 +158,141 @@ const char MAIN_PAGE[] PROGMEM = R"rawliteral(<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>RX-V1600 Remote</title>
-<link href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEUqYbutnpTMuq/70SQgIef5AAAAVUlEQVQIHWOAAPkvDAyM3+Y7MLA7NV5g4GVqKGCQYWowYTBhapBhMGB04GE4/0X+M8Pxi+6XGS67XzzO8FH+iz/Dl/q/8gx/2S/UM/y/wP6f4T8QAAB3Bx3jhPJqfQAAAABJRU5ErkJggg==" rel="icon" type="image/x-icon" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>RX-V1600</title>
+<link href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEUqYbutnpTMuq/70SQgIef5AAAAVUlEQVQIHWOAAPkvDAyM3+Y7MLA7NV5g4GVqKGCQYWowYTBhapBhMGB04GE4/0X+M8Pxi+6XGS67XzzO8FH+iz/Dl/q/8gx/2S/UM/y/wP6f4T8QAAB3Bx3jhPJqfQAAAABJRU5ErkJggg==" rel="icon" type="image/x-icon"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;
- display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:16px}
-h1{font-size:1.3em;margin-bottom:12px;color:#a0c4ff}
-.card{background:#16213e;border-radius:16px;padding:16px;width:100%;max-width:380px;margin-bottom:12px}
-.card h2{font-size:.85em;text-transform:uppercase;color:#7a8ba8;margin-bottom:10px;letter-spacing:.05em}
-.row{display:flex;gap:8px;margin-bottom:8px}
-.row:last-child{margin-bottom:0}
-button{flex:1;padding:12px 8px;border:none;border-radius:12px;font-size:.95em;font-weight:600;
- cursor:pointer;transition:opacity .15s,transform .05s;color:#fff;background:#3a506b}
-button:active{transform:scale(.96);opacity:.8}
-button.on{background:#2d6a4f}
-button.off{background:#9b2226}
-button.act{background:#3a506b}
-button.active{box-shadow:0 0 0 2px #a0c4ff}
-.status{font-size:.8em;color:#7a8ba8;text-align:right;padding:4px 0}
-.vol-section{padding:20px 16px}
-.vol-value{text-align:center;font-size:2em;font-weight:700;color:#a0c4ff;margin-bottom:8px;
+ display:flex;flex-direction:column;align-items:center;padding:12px;overflow-x:hidden}
+.w{width:100%;max-width:380px}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;margin-bottom:4px}
+.hdr span{font-size:.7em;text-transform:uppercase;color:#7a8ba8;letter-spacing:.04em}
+.hdr em{font-style:normal;font-size:.8em;color:#a0c4ff}
+.row{display:flex;gap:6px;margin-bottom:6px}
+button{flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:.9em;font-weight:600;
+ cursor:pointer;color:#fff;background:#3a506b;-webkit-tap-highlight-color:transparent}
+button:active{opacity:.7}
+.on{background:#2d6a4f}.off{background:#9b2226}
+.vv{text-align:center;font-size:2.2em;font-weight:700;color:#a0c4ff;margin:8px 0;
  font-variant-numeric:tabular-nums}
-.vol-slider{width:100%;height:44px;-webkit-appearance:none;appearance:none;background:transparent;
- cursor:pointer;margin:8px 0}
-.vol-slider::-webkit-slider-runnable-track{height:8px;background:#3a506b;border-radius:4px}
-.vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;background:#a0c4ff;
- border-radius:50%;margin-top:-12px;border:3px solid #16213e}
-.vol-slider::-moz-range-track{height:8px;background:#3a506b;border-radius:4px;border:none}
-.vol-slider::-moz-range-thumb{width:32px;height:32px;background:#a0c4ff;border-radius:50%;
- border:3px solid #16213e}
-.vol-btns{display:flex;gap:8px;margin-top:8px}
-.vol-btns button{font-size:1.4em;padding:14px;background:#3a506b;border-radius:12px}
-.info{font-size:.75em;color:#4a5568;text-align:center;margin-top:8px}
+.vs{width:100%;height:48px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;margin:4px 0}
+.vs::-webkit-slider-runnable-track{height:8px;background:#3a506b;border-radius:4px}
+.vs::-webkit-slider-thumb{-webkit-appearance:none;width:36px;height:36px;background:#a0c4ff;
+ border-radius:50%;margin-top:-14px;border:3px solid #16213e}
+.vs::-moz-range-track{height:8px;background:#3a506b;border-radius:4px;border:none}
+.vs::-moz-range-thumb{width:36px;height:36px;background:#a0c4ff;border-radius:50%;border:3px solid #16213e}
+.vb{display:flex;gap:6px}.vb button{font-size:1.3em;padding:12px;border-radius:10px}
+.sys{display:none;gap:6px;margin-top:6px}.sys.show{display:flex}
+.sys button{font-size:.8em;padding:8px;background:#6b3a3a}
+.tog{margin-top:8px;font-size:.7em;color:#4a5568;cursor:pointer;text-align:center}
+.tog:hover{color:#7a8ba8}
+.info{font-size:.7em;color:#4a5568;text-align:center;margin-top:6px}
 .info a{color:#7a8ba8}
-.footer-btns{display:flex;gap:8px;margin-top:4px;margin-bottom:8px;width:100%;max-width:380px}
-.footer-btns button{background:#3a506b;font-size:.8em;padding:8px}
 </style>
 </head>
 <body>
-<h1>&#127925; RX-V1600 Remote</h1>
+<div class="w">
 
-<div class="card">
- <h2>Power</h2>
- <div class="row">
-  <button class="on" onclick="cmd('/power-on')">On</button>
-  <button class="off" onclick="cmd('/power-off')">Off</button>
- </div>
- <div class="status" id="st-power"></div>
+<div class="hdr"><span>Power</span><em id="st-power"></em></div>
+<div class="row">
+ <button class="on" onclick="cmd('/power-on')">On</button>
+ <button class="off" onclick="cmd('/power-off')">Off</button>
 </div>
 
-<div class="card">
- <h2>Input</h2>
- <div class="row">
-  <button class="act" onclick="cmd('/tv')">TV</button>
-  <button class="act" onclick="cmd('/bt')">Bluetooth</button>
- </div>
- <div class="status" id="st-input"></div>
+<div class="hdr"><span>Input</span><em id="st-input"></em></div>
+<div class="row">
+ <button onclick="cmd('/tv')">TV</button>
+ <button onclick="cmd('/bt')">Bluetooth</button>
 </div>
 
-<div class="card">
- <h2>Speakers</h2>
- <div class="row">
-  <button class="on" onclick="cmd('/a-on')">A On</button>
-  <button class="off" onclick="cmd('/a-off')">A Off</button>
- </div>
- <div class="status" id="st-spkA"></div>
- <div class="row">
-  <button class="on" onclick="cmd('/b-on')">B On</button>
-  <button class="off" onclick="cmd('/b-off')">B Off</button>
- </div>
- <div class="status" id="st-spkB"></div>
+<div class="hdr"><span>Speaker A</span><em id="st-spkA"></em></div>
+<div class="row">
+ <button class="on" onclick="cmd('/a-on')">On</button>
+ <button class="off" onclick="cmd('/a-off')">Off</button>
 </div>
 
-<div class="card">
- <h2>Night Mode</h2>
- <div class="row">
-  <button class="on" onclick="cmd('/day')">Day</button>
-  <button class="off" onclick="cmd('/night')">Night</button>
- </div>
- <div class="status" id="st-night"></div>
+<div class="hdr"><span>Speaker B</span><em id="st-spkB"></em></div>
+<div class="row">
+ <button class="on" onclick="cmd('/b-on')">On</button>
+ <button class="off" onclick="cmd('/b-off')">Off</button>
 </div>
 
-<div class="card">
- <h2>Mute</h2>
- <div class="row">
-  <button class="on" onclick="cmd('/mute-off')">Unmute</button>
-  <button class="off" onclick="cmd('/mute-on')">Mute</button>
- </div>
- <div class="status" id="st-mute"></div>
+<div class="hdr"><span>Night</span><em id="st-night"></em></div>
+<div class="row">
+ <button class="on" onclick="cmd('/day')">Day</button>
+ <button class="off" onclick="cmd('/night')">Night</button>
 </div>
 
-<div class="card vol-section">
- <h2>Volume</h2>
- <div class="vol-value" id="vol-value">-- dB</div>
- <input class="vol-slider" id="vol-slider" type="range" min="-80" max="16" step="1" value="-40">
- <div class="vol-btns">
-  <button onclick="volStep(-1)">&#9660;</button>
-  <button onclick="volStep(1)">&#9650;</button>
- </div>
+<div class="hdr"><span>Mute</span><em id="st-mute"></em></div>
+<div class="row">
+ <button class="on" onclick="cmd('/mute-off')">Unmute</button>
+ <button class="off" onclick="cmd('/mute-on')">Mute</button>
 </div>
 
-<div class="footer-btns">
+<div class="vv" id="vol-value">-- dB</div>
+<input class="vs" id="vol-slider" type="range" min="-80" max="16" step="1" value="-40">
+<div class="vb">
+ <button onclick="volStep(-1)">&#9660;</button>
+ <button onclick="volStep(1)">&#9650;</button>
+</div>
+
+<div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">&#9881; System</div>
+<div class="sys" id="sys">
  <button onclick="location.reload()">Reload</button>
- <button onclick="cmd('/reset')">Reset</button>
+ <button onclick="if(confirm('Reset?'))cmd('/reset')">Reset</button>
  <button onclick="location.href='/update'">Update</button>
 </div>
 
 <div class="info" id="info"></div>
+</div>
 
 <script>
 var busy=false,volBusy=false,volTimer=null;
-
-function ajax(method,url,data,cb){
+function ajax(m,u,d,cb){
  var x=new XMLHttpRequest();
  x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
- x.open(method,url);
- if(data){x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.send(data)}
+ x.open(m,u);
+ if(d){x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.send(d)}
  else x.send();
 }
-
-function cmd(url){
- if(busy)return;
- busy=true;
- ajax('POST',url,null,function(){busy=false;poll()});
+function cmd(u){
+ if(busy)return;busy=true;
+ ajax('POST',u,null,function(){busy=false;poll()});
 }
-
-function volStep(dir){
- if(volBusy)return;
- volBusy=true;
- ajax('POST',dir>0?'/vol-up':'/vol-down',null,function(){
-  volBusy=false;
-  if(volTimer)clearTimeout(volTimer);
-  volTimer=setTimeout(poll,500);
+function volStep(d){
+ if(volBusy)return;volBusy=true;
+ ajax('POST',d>0?'/vol-up':'/vol-down',null,function(){
+  volBusy=false;if(volTimer)clearTimeout(volTimer);volTimer=setTimeout(poll,500);
  });
 }
-
-var slider=document.getElementById('vol-slider');
-var sliderBusy=false;
-slider.oninput=function(){
+var sl=document.getElementById('vol-slider'),slBusy=false;
+sl.oninput=function(){
  document.getElementById('vol-value').textContent=this.value+'.0 dB';
- if(!sliderBusy){
-  sliderBusy=true;
-  ajax('POST','/vol','v='+this.value,function(){sliderBusy=false});
- }
+ if(!slBusy){slBusy=true;ajax('POST','/vol','v='+this.value,function(){slBusy=false})}
 };
-slider.onchange=function(){
- ajax('POST','/vol','v='+this.value,function(){sliderBusy=false;poll()});
+sl.onchange=function(){
+ ajax('POST','/vol','v='+this.value,function(){slBusy=false;poll()});
 };
-
 function poll(){
  ajax('GET','/state',null,function(x){
   if(x.status!=200)return;
   try{var s=JSON.parse(x.responseText)}catch(e){return}
   document.getElementById('st-power').textContent=s.power;
   document.getElementById('st-input').textContent=s.input;
-  document.getElementById('st-spkA').textContent='A: '+s.spkA;
-  document.getElementById('st-spkB').textContent='B: '+s.spkB;
+  document.getElementById('st-spkA').textContent=s.spkA;
+  document.getElementById('st-spkB').textContent=s.spkB;
   document.getElementById('st-night').textContent=s.night;
   document.getElementById('st-mute').textContent=s.mute;
   if(s.volDb>-999){
    document.getElementById('vol-value').textContent=s.volume;
-   if(!sliderBusy)slider.value=s.volDb;
+   if(!slBusy)sl.value=s.volDb;
   }
   document.getElementById('info').innerHTML=
-   'v'+s.version+' &middot; Heap: '+s.heap+' &middot; <a href="https://github.com/joba-1/Joba_RxV1600" target="_blank">Github</a>';
+   'v'+s.version+' &middot; '+s.heap+'B &middot; <a href="https://github.com/joba-1/Joba_RxV1600">Github</a>';
  });
 }
-
-poll();
-setInterval(poll,2000);
+poll();setInterval(poll,2000);
 </script>
 </body>
 </html>)rawliteral";
