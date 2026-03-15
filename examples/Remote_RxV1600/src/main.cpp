@@ -179,6 +179,7 @@ button{flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:.9em;fon
 button:active{opacity:.7}
 .on{background:#2d6a4f}.off{background:#9b2226}
 .act{box-shadow:0 0 0 3px #a0c4ff;transform:scale(1.04)}
+.dis{opacity:.3;pointer-events:none}
 .vv{text-align:center;font-size:2.2em;font-weight:700;color:#a0c4ff;margin:8px 0;
  font-variant-numeric:tabular-nums}
 .vs{width:100%;height:48px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;margin:4px 0}
@@ -205,6 +206,7 @@ button:active{opacity:.7}
  <button id="b-poff" class="off" onclick="cmd('/power-off')">Off</button>
 </div>
 
+<div id="ctrl">
 <div class="hdr"><span>Input</span><em id="st-input"></em></div>
 <div class="row">
  <button id="b-tv" onclick="cmd('/tv')">TV</button>
@@ -240,6 +242,7 @@ button:active{opacity:.7}
 <div class="vb">
  <button onclick="volStep(-1)">&#9660;</button>
  <button onclick="volStep(1)">&#9650;</button>
+</div>
 </div>
 
 <div class="info" id="info"></div>
@@ -292,6 +295,8 @@ function poll(){
   function hi(a,b,v){var x=document.getElementById(a),y=document.getElementById(b);
    x.classList.toggle('act',v);y.classList.toggle('act',!v)}
   hi('b-pon','b-poff',/Main On/.test(s.power));
+  var on=/Main On/.test(s.power);
+  document.getElementById('ctrl').classList.toggle('dis',!on);
   hi('b-tv','b-bt',s.input==='Dtv'||s.input==='TV');
   hi('b-aon','b-aoff',s.spkA==='On');
   hi('b-bon','b-boff',s.spkB==='On');
@@ -706,22 +711,21 @@ void setup() {
     Serial.begin(BAUDRATE);
     Serial.println("\nStarting " PROGNAME " v" VERSION " " __DATE__ " " __TIME__);
 
-    String host(HOSTNAME);
-    host.toLowerCase();
-    WiFi.hostname(host.c_str());
+    WiFi.setHostname(HOSTNAME);
     WiFi.mode(WIFI_STA);
 
     // Syslog setup
     syslog.server(SYSLOG_SERVER, SYSLOG_PORT);
-    syslog.deviceHostname(WiFi.getHostname());
+    syslog.deviceHostname(HOSTNAME);
     syslog.appName("Joba1");
     syslog.defaultPriority(LOG_KERN);
 
     digitalWrite(LED_PIN, LOW);
 
     WiFiManager wm;
+    wm.setHostname(HOSTNAME);
     wm.setConfigPortalTimeout(180);
-    if (!wm.autoConnect(WiFi.getHostname(), WiFi.getHostname())) {
+    if (!wm.autoConnect(HOSTNAME, HOSTNAME)) {
         Serial.println("Failed to connect WLAN, about to reset");
         for (int i = 0; i < 20; i++) {
             digitalWrite(LED_PIN, (i & 1) ? HIGH : LOW);
@@ -738,7 +742,7 @@ void setup() {
         HOSTNAME, WiFi.localIP().toString().c_str());
     slog(msg, LOG_NOTICE);
 
-    if (MDNS.begin(WiFi.getHostname())) {
+    if (MDNS.begin(HOSTNAME)) {
         MDNS.addService("http", "tcp", 80);
         slog("mDNS started", LOG_NOTICE);
     }
