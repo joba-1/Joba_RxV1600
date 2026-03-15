@@ -144,7 +144,6 @@ const char* afterLastSpace(const char* s) {
 
 
 char web_msg[80] = "";  // main web page displays and then clears this
-bool webpage_update = false;  // true if web page changed rxv1600 state -> refresh every 1s until rxv1600 responded
 int first_vol = 0;  // double vol up or down web commands: first changes 0.5dB, following change 1dB
 
 // Standard web page
@@ -156,6 +155,9 @@ const char *main_page() {
         "  <style>\n"
         "   th, td { padding: 5px; }\n"
         "   input { width: 90%%; padding: 5px; margin: 5px; }\n"
+        "   .on { background: #4a4; color: white; }\n"
+        "   .off { background: #a44; color: white; }\n"
+        "   .act { background: #46a; color: white; }\n"
         "   slider { height: 50px; margin: 5px; }\n"
         "  </style>\n"
         "  <meta charset=\"utf-8\">\n"
@@ -168,38 +170,38 @@ const char *main_page() {
         "  <p>%s</p>\n"
         "  <table>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/power-on\"><input type=\"submit\" value=\"Main On\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/power-off\"><input type=\"submit\" value=\"Main Off\"></form></td>\n"
+        "    <td><input class=\"on\" type=\"button\" value=\"Main On\" onclick=\"btnClick('/power-on')\"></td>\n"
+        "    <td><input class=\"off\" type=\"button\" value=\"Main Off\" onclick=\"btnClick('/power-off')\"></td>\n"
         "    <td>&nbsp;</td><td>%8.8s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/tv\"><input type=\"submit\" style=\"width: 90%%;\" value=\"TV\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/bt\"><input type=\"submit\" value=\"Bluetooth\"></form></td>\n"
+        "    <td><input class=\"act\" type=\"button\" value=\"TV\" onclick=\"btnClick('/tv')\"></td>\n"
+        "    <td><input class=\"act\" type=\"button\" value=\"Bluetooth\" onclick=\"btnClick('/bt')\"></td>\n"
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/a-on\"><input type=\"submit\" value=\"A On\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/a-off\"><input type=\"submit\" value=\"A Off\"></form></td>\n"
+        "    <td><input class=\"on\" type=\"button\" value=\"A On\" onclick=\"btnClick('/a-on')\"></td>\n"
+        "    <td><input class=\"off\" type=\"button\" value=\"A Off\" onclick=\"btnClick('/a-off')\"></td>\n"
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/b-on\"><input type=\"submit\" value=\"B On\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/b-off\"><input type=\"submit\" value=\"B Off\"></form></td>\n"
+        "    <td><input class=\"on\" type=\"button\" value=\"B On\" onclick=\"btnClick('/b-on')\"></td>\n"
+        "    <td><input class=\"off\" type=\"button\" value=\"B Off\" onclick=\"btnClick('/b-off')\"></td>\n"
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/day\"><input type=\"submit\" value=\"Day\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/night\"><input type=\"submit\" value=\"Night\"></form></td>\n"
+        "    <td><input class=\"on\" type=\"button\" value=\"Day\" onclick=\"btnClick('/day')\"></td>\n"
+        "    <td><input class=\"off\" type=\"button\" value=\"Night\" onclick=\"btnClick('/night')\"></td>\n"
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/mute-on\"><input type=\"submit\" value=\"Mute\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/mute-off\"><input type=\"submit\" value=\"Unmute\"></form></td>\n"
+        "    <td><input class=\"off\" type=\"button\" value=\"Mute\" onclick=\"btnClick('/mute-on')\"></td>\n"
+        "    <td><input class=\"on\" type=\"button\" value=\"Unmute\" onclick=\"btnClick('/mute-off')\"></td>\n"
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><input type=\"button\" value=\"Vol -\" onclick=\"volChange('/vol-down')\"></td>\n"
-        "    <td><input type=\"button\" value=\"Vol +\" onclick=\"volChange('/vol-up')\"></td>\n"
+        "    <td><input class=\"act\" type=\"button\" value=\"Vol -\" onclick=\"volChange('/vol-down')\"></td>\n"
+        "    <td><input class=\"act\" type=\"button\" value=\"Vol +\" onclick=\"volChange('/vol-up')\"></td>\n"
         "    <td>&nbsp;</td><td id=\"value\">%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
@@ -241,6 +243,11 @@ const char *main_page() {
         "    }\n"
         "   }\n"
         "   sliderCallback('slider', 'value', '/vol');\n"
+        "   function btnClick(url) {\n"
+        "    ajax(url, '', function() {\n"
+        "     setTimeout(function() { location.reload(); }, 1000);\n"
+        "    });\n"
+        "   }\n"
         "   var volBusy = false;\n"
         "   var volTimer = null;\n"
         "   function volChange(url) {\n"
@@ -271,7 +278,7 @@ const char *main_page() {
     const char *muted = rxv.report_value_string(0x23);
     const char *volume = rxv.report_value_string(0x26);
     int vol_db = volume ? atoi(volume) : 0;
-    const char *refresh = webpage_update ? "  <meta http-equiv=\"refresh\" content=\"1; url=/\"> \n" : "";
+    const char *refresh = "";
     static char curr_time[30];
     time_t now;
     time(&now);
@@ -316,55 +323,47 @@ void setup_webserver() {
     // Power on
     web_server.on("/power-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
         publish(MQTT_TOPIC "/cmd", "MainZonePower_On");
-        webpage_update = true;
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Power off
     web_server.on("/power-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
         publish(MQTT_TOPIC "/cmd", "MainZonePower_Off");
-        webpage_update = true;
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Speaker A on
     web_server.on("/a-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_On");
-        webpage_update = true;
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Speaker A off
     web_server.on("/a-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayA_Off");
-        webpage_update = true;
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Speaker B on
     web_server.on("/b-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_On");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Speaker B off
     web_server.on("/b-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "SpeakerRelayB_Off");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Night Mode off
     web_server.on("/day", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "NightMode_Off");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Night Modes cycle
     web_server.on("/night", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         const char *mode;
         uint8_t current_mode = rxv.report_value(0x8b);
         switch(current_mode) {
@@ -381,14 +380,19 @@ void setup_webserver() {
                 break;
         }
         publish(MQTT_TOPIC "/cmd", mode);
-        request->redirect("/"); 
+        request->send(200); 
+    });
+
+    // Mute on
+    web_server.on("/mute-on", HTTP_POST, [](AsyncWebServerRequest *request) { 
+        publish(MQTT_TOPIC "/cmd", "Mute_On");
+        request->send(200); 
     });
 
     // Mute off
     web_server.on("/mute-off", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Mute_Off");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Volume up
@@ -419,16 +423,14 @@ void setup_webserver() {
 
     // TV input
     web_server.on("/tv", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Input_Dtv");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Bluetooth input
     web_server.on("/bt", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         publish(MQTT_TOPIC "/cmd", "Input_Cbl-Sat");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     web_server.on("/wipe", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -689,8 +691,6 @@ void recvd( const char *resp, void *ctx ) {
     const char *name;
     const char *value;
     char buf[10];
-
-    webpage_update = false;
 
     if( resp ) {
         if( rxv.decodeConfig(resp, power) ) {
