@@ -241,13 +241,14 @@ button:active{opacity:.7}
  <button onclick="volStep(1)">&#9650;</button>
 </div>
 
+<div class="info" id="info"></div>
+
 <div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">&#9881; System</div>
 <div class="sys" id="sys">
+ <button onclick="if(confirm('Wipe WLAN config and restart?'))cmd('/wipe')">Wipe WLAN</button>
  <button onclick="if(confirm('Reset?'))cmd('/reset')">Reset</button>
  <button onclick="location.href='/update'">Update</button>
 </div>
-
-<div class="info" id="info"></div>
 </div>
 
 <script>
@@ -300,9 +301,8 @@ function poll(){
    if(!slBusy)sl.value=s.volDb;
   }
   document.getElementById('info').innerHTML=
-   'v'+s.version+' &middot; '+s.heap+'B<br>'+
-   (s.started?'Started '+s.started:'')+(s.built?' &middot; Built '+s.built:'')+
-   '<br><a href="https://github.com/joba-1/Joba_RxV1600">Github</a>';
+   (s.started?'Started '+s.started:'')+(s.built?' &middot; Built '+s.built:'')+'<br>'+
+   'v'+s.version+' &middot; '+(s.heap/1024|0)+'kB &middot; <a href="https://github.com/joba-1/Joba_RxV1600">Github</a>';
  });
 }
 poll();setInterval(poll,2000);
@@ -411,6 +411,16 @@ void setup_webserver() {
         request->send(200, "text/plain", "Resetting...");
         delay(200);
         Serial1.end();
+        ESP.restart();
+    });
+
+    web_server.on("/wipe", HTTP_POST, [](AsyncWebServerRequest *request) {
+        slog("WIPE WLAN config and restart", LOG_NOTICE);
+        request->send(200, "text/plain", "Wiping WLAN config...");
+        delay(200);
+        Serial1.end();
+        WiFiManager wm;
+        wm.resetSettings();
         ESP.restart();
     });
 
