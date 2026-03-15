@@ -198,8 +198,8 @@ const char *main_page() {
         "    <td>&nbsp;</td><td>%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
-        "    <td><form method=\"POST\" action=\"/vol-down\"><input type=\"submit\" value=\"Vol -\"></form></td>\n"
-        "    <td><form method=\"POST\" action=\"/vol-up\"><input type=\"submit\" value=\"Vol +\"></form></td>\n"
+        "    <td><input type=\"button\" value=\"Vol -\" onclick=\"volChange('/vol-down')\"></td>\n"
+        "    <td><input type=\"button\" value=\"Vol +\" onclick=\"volChange('/vol-up')\"></td>\n"
         "    <td>&nbsp;</td><td id=\"value\">%s</td>\n"
         "   </tr>\n"
         "   <tr>\n"
@@ -241,6 +241,18 @@ const char *main_page() {
         "    }\n"
         "   }\n"
         "   sliderCallback('slider', 'value', '/vol');\n"
+        "   var volBusy = false;\n"
+        "   var volTimer = null;\n"
+        "   function volChange(url) {\n"
+        "    if (!volBusy) {\n"
+        "     volBusy = true;\n"
+        "     if (volTimer) clearTimeout(volTimer);\n"
+        "     ajax(url, '', function() {\n"
+        "      volBusy = false;\n"
+        "      volTimer = setTimeout(function() { location.reload(); }, 1000);\n"
+        "     });\n"
+        "    }\n"
+        "   }\n"
         "  </script>\n"
         " </body>\n"
         "</html>\n";
@@ -381,32 +393,28 @@ void setup_webserver() {
 
     // Volume up
     web_server.on("/vol-up", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         first_vol = 1;
         publish(MQTT_TOPIC "/cmd", "MainVolume_Up");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Volume down
     web_server.on("/vol-down", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         first_vol = -1;
         publish(MQTT_TOPIC "/cmd", "MainVolume_Down");
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // Set volume
     web_server.on("/vol", HTTP_POST, [](AsyncWebServerRequest *request) { 
-        webpage_update = true;
         String arg = request->arg("slider");
         if (!arg.isEmpty()) {
             int volume = atoi(arg.c_str());
             char cmd[30];
             snprintf(cmd, sizeof(cmd), "MainVolumeSet,%d", volume * 2 + 199); 
-            // slog("Set volume to %d", volume);
             publish(MQTT_TOPIC "/cmd", cmd);
         }
-        request->redirect("/"); 
+        request->send(200); 
     });
 
     // TV input
