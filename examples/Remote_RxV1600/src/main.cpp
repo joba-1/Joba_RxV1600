@@ -123,7 +123,7 @@ const char* afterLastSpace(const char* s) {
 
 // JSON state endpoint for UI polling
 void send_state(AsyncWebServerRequest *request) {
-    static char json[384];
+    static char json[448];
 
     const char *power = js(rxv.report_value_string(0x20));
     const char *input = js(rxv.report_value_string(0x21));
@@ -143,11 +143,14 @@ void send_state(AsyncWebServerRequest *request) {
         "\"night\":\"%s\",\"mute\":\"%s\","
         "\"volume\":\"%s\",\"volDb\":%d,"
         "\"version\":\"" VERSION "\","
-        "\"heap\":%u}",
+        "\"heap\":%u,"
+        "\"started\":\"%s\","
+        "\"built\":\"%s\"}",
         power, input, speaker_a, speaker_b,
         night, mute,
         volume ? volume : "", vol_raw,
-        ESP.getFreeHeap());
+        ESP.getFreeHeap(),
+        start_time, IsoDate);
 
     request->send(200, "application/json", json);
 }
@@ -186,7 +189,7 @@ button:active{opacity:.7}
 .vb{display:flex;gap:6px}.vb button{font-size:1.3em;padding:12px;border-radius:10px}
 .sys{display:none;gap:6px;margin-top:6px}.sys.show{display:flex}
 .sys button{font-size:.8em;padding:8px;background:#6b3a3a}
-.tog{margin-top:8px;font-size:.7em;color:#4a5568;cursor:pointer;text-align:center}
+.tog{margin-top:16px;font-size:.7em;color:#4a5568;cursor:pointer;text-align:center}
 .tog:hover{color:#7a8ba8}
 .info{font-size:.7em;color:#4a5568;text-align:center;margin-top:6px}
 .info a{color:#7a8ba8}
@@ -240,7 +243,6 @@ button:active{opacity:.7}
 
 <div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">&#9881; System</div>
 <div class="sys" id="sys">
- <button onclick="location.reload()">Reload</button>
  <button onclick="if(confirm('Reset?'))cmd('/reset')">Reset</button>
  <button onclick="location.href='/update'">Update</button>
 </div>
@@ -298,7 +300,9 @@ function poll(){
    if(!slBusy)sl.value=s.volDb;
   }
   document.getElementById('info').innerHTML=
-   'v'+s.version+' &middot; '+s.heap+'B &middot; <a href="https://github.com/joba-1/Joba_RxV1600">Github</a>';
+   'v'+s.version+' &middot; '+s.heap+'B<br>'+
+   (s.started?'Started '+s.started:'')+(s.built?' &middot; Built '+s.built:'')+
+   '<br><a href="https://github.com/joba-1/Joba_RxV1600">Github</a>';
  });
 }
 poll();setInterval(poll,2000);
