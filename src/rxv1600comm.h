@@ -56,7 +56,8 @@ class RxV1600Comm {
 
     Stream &_stream;
     recv_t _cb;
-    const char *_cmd;   // command to send
+    char _cmd_buf[8];    // copy of command to send (max command length is 7)
+    const char *_cmd;    // points to _cmd_buf while sending
     size_t _pos;        // received chars
     unsigned _tries;    // number of send tries
     uint32_t _sent_ms;  // start of current try

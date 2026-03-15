@@ -8,12 +8,15 @@ const unsigned RxV1600Comm::MAX_TRIES = 5;
 
 
 RxV1600Comm::RxV1600Comm(Stream &stream) : _stream(stream), _cb(NULL), _cmd(NULL), _pos(0) {
+    _cmd_buf[0] = '\0';
 }
 
 
 bool RxV1600Comm::send(const char *cmd) {
     if( _cmd ) return false;
-    _cmd = cmd;
+    strncpy(_cmd_buf, cmd, sizeof(_cmd_buf) - 1);
+    _cmd_buf[sizeof(_cmd_buf) - 1] = '\0';
+    _cmd = _cmd_buf;
     _pos = 0;
     _tries = 0;
     return true;
