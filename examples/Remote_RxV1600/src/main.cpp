@@ -250,6 +250,13 @@ button:active{opacity:.7}
 </div>
 
 <div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">Remote_RxV1600 v<span id='ver'></span> &#9881; System</div>
+<div style="display:flex;gap:8px;align-items:center;margin:8px 0;">
+    <label style="font-size:.8em;color:#7a8ba8;display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="debug-pause"> Pause updates
+    </label>
+    <button id="debug-copy" style="font-size:.8em;padding:6px;background:#3a506b;color:#fff;border-radius:6px;border:none;cursor:pointer">Copy</button>
+    <div style="flex:1"></div>
+</div>
 <div id="debuglog" style="background:#222;color:#0f0;font-size:.8em;max-height:90px;overflow:auto;margin:8px 0 4px 0;padding:4px 6px;border-radius:6px;display:block;white-space:pre-line;"></div>
 <script>window.onerror=function(msg,url,line,col,err){var el=document.getElementById('debuglog');if(el)el.textContent+='[EARLY JS ERROR] '+msg+' @'+line+':'+col+'\n';return false;};</script>
 <div class="sys" id="sys">
@@ -263,17 +270,51 @@ button:active{opacity:.7}
 <script>
 // --- Robust debug log and error handler ---
 (function(){
-  var el = document.getElementById('debuglog');
-  window.debuglog = function(msg){
-    if(el){
-      el.textContent += msg + '\n';
-      el.scrollTop = el.scrollHeight;
+    var el = document.getElementById('debuglog');
+    var chk = document.getElementById('debug-pause');
+    var btn = document.getElementById('debug-copy');
+    var debugPaused = false;
+
+    if(chk){
+        chk.addEventListener('change', function(){ debugPaused = !!chk.checked; });
     }
-  };
-  window.onerror = function(msg, url, line, col, error) {
-    window.debuglog('[JS ERROR] ' + msg + ' @' + line + ':' + col);
-    return false;
-  };
+
+    function fallbackCopy(text){
+        try{
+            var ta = document.createElement('textarea');
+            ta.style.position='fixed';ta.style.left='-9999px';ta.value = text;
+            document.body.appendChild(ta);ta.select();
+            document.execCommand('copy');document.body.removeChild(ta);return true;
+        }catch(e){return false;}
+    }
+
+    if(btn){
+        btn.addEventListener('click', function(){
+            var txt = el ? el.textContent : '';
+            if(navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(txt).then(function(){
+                    btn.textContent = 'Copied'; setTimeout(function(){ btn.textContent='Copy'; },900);
+                }).catch(function(){
+                    if(fallbackCopy(txt)) { btn.textContent='Copied'; setTimeout(function(){ btn.textContent='Copy'; },900); }
+                    else alert('Copy failed');
+                });
+            } else {
+                if(fallbackCopy(txt)) { btn.textContent='Copied'; setTimeout(function(){ btn.textContent='Copy'; },900); }
+                else alert('Copy failed');
+            }
+        });
+    }
+
+    window.debuglog = function(msg){
+        if(el && !debugPaused){
+            el.textContent += msg + '\n';
+            el.scrollTop = el.scrollHeight;
+        }
+    };
+    window.onerror = function(msg, url, line, col, error) {
+        window.debuglog('[JS ERROR] ' + msg + ' @' + line + ':' + col);
+        return false;
+    };
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -293,7 +334,12 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('pointercancel', function(e){ volStop(); });
     });
 
-  var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
+    var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
+    // Multi-inflight repeat control
+    var volInflight = []; // array of {dir,sentAt,retries}
+    var volMaxInflight = 2; // allow up to 2 inflight volume steps
+    var volCmdTimeout = 1500; // ms to wait for feedback before retry
+    var volMaxRetries = 2; // retry count per command
   function ajax(m,u,d,cb){
     var x=new XMLHttpRequest();
     x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
@@ -322,22 +368,50 @@ document.addEventListener('DOMContentLoaded', function() {
     if(!inflight){inflight=true;sendNext()}
   }
   function volNext(){
-        // Send up to volMaxInflight steps in parallel (start with 1).
+        // Send up to volMaxInflight steps in parallel.
         if(!volQ.length){
-            // nothing to do; schedule poll
             volTimer=setTimeout(poll,500);
             return;
         }
-        if(typeof volInflight === 'undefined') volInflight = 0;
-        if(typeof volMaxInflight === 'undefined') volMaxInflight = 1;
-        while(volQ.length && volInflight < volMaxInflight){
+        while(volQ.length && volInflight.length < volMaxInflight){
             var v = volQ.shift();
-            volInflight++;
-            window.debuglog('[volNext] sending ' + (v > 0 ? 'up' : 'down') + ' (inflight=' + volInflight + ')');
+            var entry = {dir: v, sentAt: Date.now(), retries: 0};
+            volInflight.push(entry);
+            window.debuglog('[volNext] sending ' + (v > 0 ? 'up' : 'down') + ' (inflight=' + volInflight.length + ')');
             ajax('POST', v>0?'/vol-up':'/vol-down', null, function(){
                 // server acknowledged; actual change confirmed via poll()
             });
+            // schedule a timeout check for this inflight command
+            (function(e){
+                setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout);
+            })(entry);
         }
+  }
+
+  function checkInflightTimeout(entry){
+      // find entry in volInflight (may have been removed by poll)
+      for(var i=0;i<volInflight.length;i++){
+          if(volInflight[i]===entry){
+              var now = Date.now();
+              if(now - entry.sentAt >= volCmdTimeout){
+                  if(entry.retries < volMaxRetries){
+                      entry.retries++;
+                      entry.sentAt = Date.now();
+                      window.debuglog('[volRetry] retrying ' + (entry.dir>0?'up':'down') + ' (retry=' + entry.retries + ')');
+                      ajax('POST', entry.dir>0?'/vol-up':'/vol-down', null, function(){});
+                      // schedule another timeout check
+                      (function(e){ setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout); })(entry);
+                  } else {
+                      // drop it after max retries
+                      window.debuglog('[volRetry] dropping ' + (entry.dir>0?'up':'down') + ' after retries');
+                      volInflight.splice(i,1);
+                      // try to send next queued steps
+                      setTimeout(volNext,50);
+                  }
+              }
+              break;
+          }
+      }
   }
   var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
   var volLastStep=0;
@@ -357,12 +431,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if(window.getSelection)window.getSelection().removeAllRanges();
     if(document.selection)document.selection.empty();
   }
-  function volStop(){
-    if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
-        volQ=[]; // Immediately stop pending changes
-        volNoFeedback=0;
-        if(typeof volInflight !== 'undefined') volInflight = 0;
-  }
+    function volStop(){
+        if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
+                volQ=[]; // Immediately stop pending changes
+                volNoFeedback=0;
+                volInflight = []; // clear inflight commands
+    }
   function volStep(d){
         window.debuglog('[volStep] dir: ' + d + ' queue: ' + volQ.length + ' noFeedback: ' + volNoFeedback);
         // cap total outstanding steps (queued + inflight)
@@ -476,12 +550,14 @@ document.addEventListener('DOMContentLoaded', function() {
         volNoFeedback=0; // Reset no-feedback counter on feedback
         // If we were waiting for feedback for sent vol commands, decrement
         // inflight and try to send more queued steps.
-        if(typeof volInflight !== 'undefined' && volInflight>0){
-                volInflight = Math.max(0, volInflight-1);
+        if(Array.isArray(volInflight) && volInflight.length>0){
+            // consume one inflight confirmation
+            volInflight.shift();
+            window.debuglog('[poll] confirmed one inflight (remaining=' + volInflight.length + ')');
         }
         if(volQ.length){
-                // send next available steps (respecting volMaxInflight)
-                setTimeout(volNext, 50);
+            // send next available steps (respecting volMaxInflight)
+            setTimeout(volNext, 50);
         }
     }
   document.getElementById('ver').textContent = s.version;
