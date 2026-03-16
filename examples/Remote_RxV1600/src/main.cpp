@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   function volNext(){
         // Send up to volMaxInflight steps in parallel.
-        if(!volQ.length){
+        if(!volQ.length && sliderQueueLatest === null){
             volTimer=setTimeout(poll,500);
             return;
         }
@@ -402,13 +402,19 @@ document.addEventListener('DOMContentLoaded', function() {
                   if(entry.retries < volMaxRetries){
                       entry.retries++;
                       entry.sentAt = Date.now();
-                      window.debuglog('[volRetry] retrying ' + (entry.dir>0?'up':'down') + ' (retry=' + entry.retries + ')');
-                      ajax('POST', entry.dir>0?'/vol-up':'/vol-down', null, function(){});
+                      if(entry.type === 'step'){
+                          window.debuglog('[volRetry] retrying ' + (entry.dir>0?'up':'down') + ' (retry=' + entry.retries + ')');
+                          ajax('POST', entry.dir>0?'/vol-up':'/vol-down', null, function(){});
+                      } else if(entry.type === 'set'){
+                          window.debuglog('[volRetry] retrying set ' + entry.value + ' (retry=' + entry.retries + ')');
+                          ajax('POST', '/vol', 'v='+entry.value, function(){});
+                      }
                       // schedule another timeout check
                       (function(e){ setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout); })(entry);
                   } else {
                       // drop it after max retries
-                      window.debuglog('[volRetry] dropping ' + (entry.dir>0?'up':'down') + ' after retries');
+                      if(entry.type === 'step') window.debuglog('[volRetry] dropping ' + (entry.dir>0?'up':'down') + ' after retries');
+                      else window.debuglog('[volRetry] dropping set ' + entry.value + ' after retries');
                       volInflight.splice(i,1);
                       // try to send next queued steps
                       setTimeout(volNext,50);
@@ -445,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function volStep(d){
         window.debuglog('[volStep] dir: ' + d + ' queue: ' + volQ.length + ' noFeedback: ' + volNoFeedback);
         // cap total outstanding steps (queued + inflight)
-        var infl = (typeof volInflight !== 'undefined') ? volInflight : 0;
+        var infl = Array.isArray(volInflight) ? volInflight.length : 0;
         if(volQ.length + infl >= 4) return;
         volQ.push(d);
         volLastStep=Date.now();
@@ -473,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(isNaN(v)) return;
         // if we have capacity, send immediately as an inflight 'set' entry
         if(volInflight.length < volMaxInflight){
-            var entry = { value: v, sentAt: Date.now(), retries: 0 };
+            var entry = { type: 'set', value: v, sentAt: Date.now(), retries: 0 };
             volInflight.push(entry);
             window.debuglog('[slider] sending set ' + v + ' (inflight=' + volInflight.length + ')');
             // record last sent for UI patience
