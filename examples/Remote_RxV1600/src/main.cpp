@@ -306,15 +306,18 @@ function volNext(){
  setTimeout(volNext, 10);
 }
 var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
+var volLastStep=0;
 function volRepeat(d){
  volRepDir=d;
  volStep(d);
  function rep(){
   if(volNoFeedback>=volRepeatLimit)return;
+  var now=Date.now();
+  if(now-volLastStep<500){volRepTimer=setTimeout(rep,500-(now-volLastStep));return;}
   volStep(d);
-  volRepTimer=setTimeout(rep,120);
+  volRepTimer=setTimeout(rep,500);
  }
- volRepTimer=setTimeout(rep,350);
+ volRepTimer=setTimeout(rep,500);
  if(window.getSelection)window.getSelection().removeAllRanges();
  if(document.selection)document.selection.empty();
 }
@@ -324,9 +327,10 @@ function volStop(){
  volNoFeedback=0;
 }
 function volStep(d){
- if(volQ.length>=5||volNoFeedback>=volRepeatLimit)return;
+ if(volQ.length>=4||volNoFeedback>=volRepeatLimit)return;
  volQ.push(d);
  volNoFeedback++;
+ volLastStep=Date.now();
  if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
 }
 var sl=document.getElementById('vol-slider'),slBusy=false;
