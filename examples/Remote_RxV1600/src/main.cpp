@@ -373,18 +373,23 @@ document.addEventListener('DOMContentLoaded', function() {
             volTimer=setTimeout(poll,500);
             return;
         }
-        while(volQ.length && volInflight.length < volMaxInflight){
+        while((volQ.length || sliderQueueLatest !== null) && volInflight.length < volMaxInflight){
+            // If there's a pending slider set, prioritize it over step queue
+            if(sliderQueueLatest !== null){
+                var v = sliderQueueLatest; sliderQueueLatest = null;
+                var entry = {type:'set', value: v, sentAt: Date.now(), retries: 0};
+                volInflight.push(entry);
+                window.debuglog('[volNext] sending set ' + v + ' (inflight=' + volInflight.length + ')');
+                ajax('POST','/vol','v='+v,function(){});
+                (function(e){ setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout); })(entry);
+                continue;
+            }
             var v = volQ.shift();
-            var entry = {dir: v, sentAt: Date.now(), retries: 0};
+            var entry = {type:'step', dir: v, sentAt: Date.now(), retries: 0};
             volInflight.push(entry);
             window.debuglog('[volNext] sending ' + (v > 0 ? 'up' : 'down') + ' (inflight=' + volInflight.length + ')');
-            ajax('POST', v>0?'/vol-up':'/vol-down', null, function(){
-                // server acknowledged; actual change confirmed via poll()
-            });
-            // schedule a timeout check for this inflight command
-            (function(e){
-                setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout);
-            })(entry);
+            ajax('POST', v>0?'/vol-up':'/vol-down', null, function(){});
+            (function(e){ setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout); })(entry);
         }
   }
 
