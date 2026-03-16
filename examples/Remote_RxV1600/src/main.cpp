@@ -243,8 +243,8 @@ button:active{opacity:.7}
 <div class="vv" id="vol-value">-- dB</div>
 <input class="vs" id="vol-slider" type="range" min="-80" max="16" step="1" value="-40">
 <div class="vb">
- <button id="b-vdn" onmousedown="volRepeat(-1)" onmouseup="volStop()" onmouseleave="volStop()" ontouchstart="volRepeat(-1)" ontouchend="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9660;</button>
- <button id="b-vup" onmousedown="volRepeat(1)" onmouseup="volStop()" onmouseleave="volStop()" ontouchstart="volRepeat(1)" ontouchend="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9650;</button>
+ <button id="b-vdn" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9660;</button>
+ <button id="b-vup" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9650;</button>
 <script>
 // Robust auto-repeat for both mouse and touch
 ['b-vdn','b-vup'].forEach(function(id){
