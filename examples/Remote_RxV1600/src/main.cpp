@@ -355,14 +355,49 @@ document.addEventListener('DOMContentLoaded', function() {
     volLastStep=Date.now();
     if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
   }
-  var sl=document.getElementById('vol-slider'),slBusy=false;
-  sl.oninput=function(){
-    document.getElementById('vol-value').textContent=this.value+'.0 dB';
-    if(!slBusy){slBusy=true;ajax('POST','/vol','v='+this.value,function(){slBusy=false})}
-  };
-  sl.onchange=function(){
-    ajax('POST','/vol','v='+this.value,function(){slBusy=false;poll()});
-  };
+    var sl=document.getElementById('vol-slider'),slBusy=false;
+    // Track when the user is actively manipulating the slider to avoid
+    // poll feedback snapping the control. Debounce user input to reduce
+    // POST frequency.
+    var slUserInteracting=false, slDebounceTimer=null;
+    var slLastSentVol=null, slSentAt=0;
+    function sendSliderImmediate(cb){
+        slBusy=true;
+        // record last sent value and timestamp so poll can be patient
+        slLastSentVol = parseInt(sl.value,10);
+        slSentAt = Date.now();
+        ajax('POST','/vol','v='+sl.value,function(){slBusy=false; if(cb) cb();});
+    }
+    // Pointer/mouse/touch start
+    sl.addEventListener('pointerdown', function(){ slUserInteracting=true; });
+    sl.addEventListener('touchstart', function(){ slUserInteracting=true; });
+    sl.addEventListener('mousedown', function(){ slUserInteracting=true; });
+    // Pointer/mouse/touch end: cancel debounce and send final value
+    function finishSlider(){
+        if(slDebounceTimer){ clearTimeout(slDebounceTimer); slDebounceTimer=null; }
+        sendSliderImmediate(function(){ poll(); });
+        slUserInteracting=false;
+    }
+    sl.addEventListener('pointerup', finishSlider);
+    sl.addEventListener('touchend', finishSlider);
+    sl.addEventListener('mouseup', finishSlider);
+
+    sl.oninput=function(){
+        document.getElementById('vol-value').textContent=this.value+'.0 dB';
+        // If not user-driven (e.g. programmatic), send immediately as before
+        if(!slUserInteracting){
+            if(!slBusy){ sendSliderImmediate(); }
+            return;
+        }
+        // Debounce while the user is sliding
+        if(slDebounceTimer) clearTimeout(slDebounceTimer);
+        slDebounceTimer = setTimeout(function(){
+            slDebounceTimer = null;
+            sendSliderImmediate(function(){ poll(); });
+            slUserInteracting = false;
+        }, 250);
+    };
+    sl.onchange=function(){ finishSlider(); };
   function poll(){
     ajax('GET','/state',null,function(x){
       if(x.status!=200)return;
@@ -388,12 +423,39 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('b-vup').classList.remove('pnd');
   document.getElementById('b-vdn').classList.remove('pnd');
   }
-  if(s.volDb>-999){
-   document.getElementById('vol-value').textContent=s.volume;
-   if(!slBusy)sl.value=s.volDb;
-    window.debuglog('[poll] feedback received, reset noFeedback');
-    volNoFeedback=0; // Reset no-feedback counter on feedback
-  }
+    if(s.volDb>-999){
+     document.getElementById('vol-value').textContent=s.volume;
+     var reported = s.volDb;
+     var now = Date.now();
+     // If we recently sent a set request, be patient up to 2s and don't
+     // overwrite the slider while awaiting the receiver's feedback.
+     if(slLastSentVol !== null){
+         if(reported === slLastSentVol){
+             // feedback arrived as expected
+             slLastSentVol = null; slSentAt = 0;
+         }
+         else if(now - slSentAt < 2000){
+             window.debuglog('[poll] delayed feedback, ignoring reported vol ' + reported);
+             volNoFeedback=0;
+             // skip updating slider
+             reported = null;
+         }
+         else {
+             // waited long enough, accept reported value
+             slLastSentVol = null; slSentAt = 0;
+         }
+     }
+     if(reported !== null){
+         if(!slUserInteracting && !slDebounceTimer && !slBusy){
+             sl.value = reported;
+         }
+         else {
+             window.debuglog('[poll] skipping slider update during interaction/busy');
+         }
+     }
+        window.debuglog('[poll] feedback received, reset noFeedback');
+        volNoFeedback=0; // Reset no-feedback counter on feedback
+    }
   document.getElementById('ver').textContent = s.version;
 document.getElementById('info').innerHTML =
   (s.started ? 'Started ' + s.started : '') + (s.built ? ' &middot; Built ' + s.built : '') + '<br>' +
