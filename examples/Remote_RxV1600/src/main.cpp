@@ -300,7 +300,10 @@ function cmd(u,btn){
 function volNext(){
  if(!volQ.length){volBusy=false;volTimer=setTimeout(poll,500);return}
  var v=volQ.shift();
- ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){volNext()});
+ // Directly send, no callback chaining, allow parallel requests
+ ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){});
+ // Schedule next step immediately
+ setTimeout(volNext, 10);
 }
 var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
 function volRepeat(d){
