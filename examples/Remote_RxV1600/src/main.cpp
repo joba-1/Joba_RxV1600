@@ -622,8 +622,9 @@ pollIv=setInterval(poll,pollInterval);
  btn.addEventListener('mousedown',setPollFast);
  btn.addEventListener('touchstart',setPollFast);
 });
-sl.oninput=setPollFast;
-sl.onchange=setPollFast;
+// Do not overwrite existing handlers; add listeners to speed polling while interacting
+sl.addEventListener('input', setPollFast);
+sl.addEventListener('change', setPollFast);
 });
 </script>
 </body>
