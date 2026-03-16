@@ -593,8 +593,8 @@ document.addEventListener('DOMContentLoaded', function() {
             volInflight.shift();
             window.debuglog('[poll] confirmed one inflight (remaining=' + volInflight.length + ')');
         }
-        if(volQ.length){
-            // send next available steps (respecting volMaxInflight)
+        if(volQ.length || sliderQueueLatest !== null){
+            // send next available steps or pending slider set
             setTimeout(volNext, 50);
         }
     }
