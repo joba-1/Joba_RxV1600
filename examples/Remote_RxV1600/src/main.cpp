@@ -337,9 +337,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
     // Multi-inflight repeat control
     var volInflight = []; // array of {dir,sentAt,retries}
-    var volMaxInflight = 2; // allow up to 2 inflight volume steps
-    var volCmdTimeout = 1500; // ms to wait for feedback before retry
+    var volMaxInflight = 4; // allow up to 4 inflight volume steps (snappier repeat)
+    var volCmdTimeout = 1200; // ms to wait for feedback before retry
     var volMaxRetries = 2; // retry count per command
+    var volRepeatInterval = 180; // ms between auto-repeat steps when holding
   function ajax(m,u,d,cb){
     var x=new XMLHttpRequest();
     x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
@@ -431,14 +432,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (volRepTimer && volRepDir === d) return;
         volRepDir=d;
         volStep(d);
-    function rep(){
-      if(volNoFeedback>=volRepeatLimit)return;
-      var now=Date.now();
-      if(now-volLastStep<500){volRepTimer=setTimeout(rep,500-(now-volLastStep));return;}
-      volStep(d);
-      volRepTimer=setTimeout(rep,500);
-    }
-    volRepTimer=setTimeout(rep,500);
+        function rep(){
+            if(volNoFeedback>=volRepeatLimit) return;
+            var now = Date.now();
+            if(now - volLastStep < volRepeatInterval){
+                    volRepTimer = setTimeout(rep, volRepeatInterval - (now - volLastStep));
+                    return;
+            }
+            volStep(d);
+            volRepTimer = setTimeout(rep, volRepeatInterval);
+        }
+        volRepTimer = setTimeout(rep, volRepeatInterval);
     if(window.getSelection)window.getSelection().removeAllRanges();
     if(document.selection)document.selection.empty();
   }
