@@ -245,21 +245,13 @@ button:active{opacity:.7}
 <div class="vb">
  <button id="b-vdn" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9660;</button>
  <button id="b-vup" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9650;</button>
-<script>
-// Robust auto-repeat for both mouse and touch
-['b-vdn','b-vup'].forEach(function(id){
- var btn=document.getElementById(id);
- btn.addEventListener('touchstart',function(e){e.preventDefault();volRepeat(id==='b-vup'?1:-1);});
- btn.addEventListener('touchend',function(e){e.preventDefault();volStop();});
- btn.addEventListener('mousedown',function(e){volRepeat(id==='b-vup'?1:-1);});
- btn.addEventListener('mouseup',volStop);
- btn.addEventListener('mouseleave',volStop);
-});
-</script>
+
 </div>
 </div>
 
 <div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">Remote_RxV1600 v<span id='ver'></span> &#9881; System</div>
+<div id="debuglog" style="background:#222;color:#0f0;font-size:.8em;max-height:90px;overflow:auto;margin:8px 0 4px 0;padding:4px 6px;border-radius:6px;display:block;white-space:pre-line;"></div>
+<script>window.onerror=function(msg,url,line,col,err){var el=document.getElementById('debuglog');if(el)el.textContent+='[EARLY JS ERROR] '+msg+' @'+line+':'+col+'\n';return false;};</script>
 <div class="sys" id="sys">
  <div class='info' id='info' style='margin-bottom:8px'></div>
  <button onclick="if(confirm('Wipe WLAN config and restart?\n\nConnect to WiFi AP \x27remote-rxv1600\x27\nand open http://192.168.4.1 to reconfigure.')){cmd('/wipe');clearInterval(pollIv);document.body.style.opacity='.3';document.getElementById('info').textContent='Wiping WLAN config...'}">Wipe WLAN</button>
@@ -269,81 +261,111 @@ button:active{opacity:.7}
 </div>
 
 <script>
-var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
-function ajax(m,u,d,cb){
- var x=new XMLHttpRequest();
- x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
- x.open(m,u);
- if(d){x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.send(d)}
- else x.send();
-}
-function hiBtn(btn){
- if(!btn)return;
- var sibs=btn.parentNode.querySelectorAll('button');
- sibs.forEach(function(b){b.classList.toggle('act',b===btn);b.classList.remove('pnd')});
- btn.classList.add('pnd');
-}
-function sendNext(){
- if(!pending){inflight=false;setTimeout(poll,800);return}
- var p=pending;pending=null;
- ajax('POST',p.u,null,function(){sendNext()});
-}
-function cmd(u,btn){
- if(btn){
-  hiBtn(btn);
-  if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
-  if(btn.id==='b-poff')document.getElementById('ctrl').classList.add('dis');
- }
- pending={u:u};
- if(!inflight){inflight=true;sendNext()}
-}
-function volNext(){
- if(!volQ.length){volBusy=false;volTimer=setTimeout(poll,500);return}
- var v=volQ.shift();
- // Directly send, no callback chaining, allow parallel requests
- ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){});
- // Schedule next step immediately
- setTimeout(volNext, 10);
-}
-var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
-var volLastStep=0;
-function volRepeat(d){
- volRepDir=d;
- volStep(d);
- function rep(){
-  if(volNoFeedback>=volRepeatLimit)return;
-  var now=Date.now();
-  if(now-volLastStep<500){volRepTimer=setTimeout(rep,500-(now-volLastStep));return;}
-  volStep(d);
-  volRepTimer=setTimeout(rep,500);
- }
- volRepTimer=setTimeout(rep,500);
- if(window.getSelection)window.getSelection().removeAllRanges();
- if(document.selection)document.selection.empty();
-}
-function volStop(){
- if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
- volQ=[]; // Immediately stop pending changes
- volNoFeedback=0;
-}
-function volStep(d){
- if(volQ.length>=4||volNoFeedback>=volRepeatLimit)return;
- volQ.push(d);
- volNoFeedback++;
- volLastStep=Date.now();
- if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
-}
-var sl=document.getElementById('vol-slider'),slBusy=false;
-sl.oninput=function(){
- document.getElementById('vol-value').textContent=this.value+'.0 dB';
- if(!slBusy){slBusy=true;ajax('POST','/vol','v='+this.value,function(){slBusy=false})}
-};
-sl.onchange=function(){
- ajax('POST','/vol','v='+this.value,function(){slBusy=false;poll()});
-};
-function poll(){
- ajax('GET','/state',null,function(x){
-  if(x.status!=200)return;
+// --- Robust debug log and error handler ---
+(function(){
+  var el = document.getElementById('debuglog');
+  window.debuglog = function(msg){
+    if(el){
+      el.textContent += msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+  };
+  window.onerror = function(msg, url, line, col, error) {
+    window.debuglog('[JS ERROR] ' + msg + ' @' + line + ':' + col);
+    return false;
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Robust auto-repeat for both mouse and touch
+  ['b-vdn','b-vup'].forEach(function(id){
+    var btn=document.getElementById(id);
+    btn.addEventListener('touchstart',function(e){e.preventDefault();volRepeat(id==='b-vup'?1:-1);});
+    btn.addEventListener('touchend',function(e){e.preventDefault();volStop();});
+    btn.addEventListener('mousedown',function(e){volRepeat(id==='b-vup'?1:-1);});
+    btn.addEventListener('mouseup',volStop);
+    btn.addEventListener('mouseleave',volStop);
+  });
+
+  var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
+  function ajax(m,u,d,cb){
+    var x=new XMLHttpRequest();
+    x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
+    x.open(m,u);
+    if(d){x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.send(d)}
+    else x.send();
+  }
+  function hiBtn(btn){
+    if(!btn)return;
+    var sibs=btn.parentNode.querySelectorAll('button');
+    sibs.forEach(function(b){b.classList.toggle('act',b===btn);b.classList.remove('pnd')});
+    btn.classList.add('pnd');
+  }
+  function sendNext(){
+    if(!pending){inflight=false;setTimeout(poll,800);return}
+    var p=pending;pending=null;
+    ajax('POST',p.u,null,function(){sendNext()});
+  }
+  function cmd(u,btn){
+    if(btn){
+      hiBtn(btn);
+      if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
+      if(btn.id==='b-poff')document.getElementById('ctrl').classList.add('dis');
+    }
+    pending={u:u};
+    if(!inflight){inflight=true;sendNext()}
+  }
+  function volNext(){
+    if(!volQ.length){volBusy=false;volTimer=setTimeout(poll,500);return}
+    var v=volQ.shift();
+    window.debuglog('[volNext] sending ' + (v > 0 ? 'up' : 'down'));
+    // Directly send, no callback chaining, allow parallel requests
+    ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){});
+    // Schedule next step immediately
+    setTimeout(volNext, 10);
+  }
+  var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
+  var volLastStep=0;
+    function volRepeat(d){
+        // Ignore duplicate start if already repeating in same direction
+        if (volRepTimer && volRepDir === d) return;
+        volRepDir=d;
+        volStep(d);
+    function rep(){
+      if(volNoFeedback>=volRepeatLimit)return;
+      var now=Date.now();
+      if(now-volLastStep<500){volRepTimer=setTimeout(rep,500-(now-volLastStep));return;}
+      volStep(d);
+      volRepTimer=setTimeout(rep,500);
+    }
+    volRepTimer=setTimeout(rep,500);
+    if(window.getSelection)window.getSelection().removeAllRanges();
+    if(document.selection)document.selection.empty();
+  }
+  function volStop(){
+    if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
+    volQ=[]; // Immediately stop pending changes
+    volNoFeedback=0;
+  }
+  function volStep(d){
+    window.debuglog('[volStep] dir: ' + d + ' queue: ' + volQ.length + ' noFeedback: ' + volNoFeedback);
+    if(volQ.length>=4||volNoFeedback>=volRepeatLimit)return;
+    volQ.push(d);
+    volNoFeedback++;
+    volLastStep=Date.now();
+    if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
+  }
+  var sl=document.getElementById('vol-slider'),slBusy=false;
+  sl.oninput=function(){
+    document.getElementById('vol-value').textContent=this.value+'.0 dB';
+    if(!slBusy){slBusy=true;ajax('POST','/vol','v='+this.value,function(){slBusy=false})}
+  };
+  sl.onchange=function(){
+    ajax('POST','/vol','v='+this.value,function(){slBusy=false;poll()});
+  };
+  function poll(){
+    ajax('GET','/state',null,function(x){
+      if(x.status!=200)return;
   try{var s=JSON.parse(x.responseText)}catch(e){return}
   document.getElementById('st-power').textContent=s.power;
   document.getElementById('st-input').textContent=s.input;
@@ -369,7 +391,8 @@ function poll(){
   if(s.volDb>-999){
    document.getElementById('vol-value').textContent=s.volume;
    if(!slBusy)sl.value=s.volDb;
-   volNoFeedback=0; // Reset no-feedback counter on feedback
+    window.debuglog('[poll] feedback received, reset noFeedback');
+    volNoFeedback=0; // Reset no-feedback counter on feedback
   }
   document.getElementById('ver').textContent = s.version;
 document.getElementById('info').innerHTML =
@@ -397,6 +420,7 @@ pollIv=setInterval(poll,pollInterval);
 });
 sl.oninput=setPollFast;
 sl.onchange=setPollFast;
+});
 </script>
 </body>
 </html>)rawliteral";
