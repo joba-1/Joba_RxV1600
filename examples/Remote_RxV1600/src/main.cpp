@@ -374,7 +374,25 @@ document.getElementById('info').innerHTML =
   '<a href="https://github.com/joba-1/Joba_RxV1600">joba-1 Github</a>';
 });
 }
-poll();var pollIv=setInterval(poll,2000);
+poll();
+var pollInterval=2000, pollIv=null, pollFastTimer=null;
+function setPollFast(){
+ if(pollIv)clearInterval(pollIv);
+ pollIv=setInterval(poll,300);
+ if(pollFastTimer)clearTimeout(pollFastTimer);
+ pollFastTimer=setTimeout(function(){
+  clearInterval(pollIv);
+  pollIv=setInterval(poll,pollInterval);
+ },2000);
+}
+pollIv=setInterval(poll,pollInterval);
+['b-vdn','b-vup'].forEach(function(id){
+ var btn=document.getElementById(id);
+ btn.addEventListener('mousedown',setPollFast);
+ btn.addEventListener('touchstart',setPollFast);
+});
+sl.oninput=setPollFast;
+sl.onchange=setPollFast;
 </script>
 </body>
 </html>)rawliteral";
