@@ -454,12 +454,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // POST frequency.
     var slUserInteracting=false, slDebounceTimer=null;
     var slLastSentVol=null, slSentAt=0;
+    var sliderQueueLatest = null;
     function sendSliderImmediate(cb){
         slBusy=true;
         // record last sent value and timestamp so poll can be patient
         slLastSentVol = parseInt(sl.value,10);
         slSentAt = Date.now();
         ajax('POST','/vol','v='+sl.value,function(){slBusy=false; if(cb) cb();});
+    }
+
+    function trySendSlider(){
+        var v = (sliderQueueLatest !== null) ? sliderQueueLatest : parseInt(sl.value,10);
+        if(isNaN(v)) return;
+        // if we have capacity, send immediately as an inflight 'set' entry
+        if(volInflight.length < volMaxInflight){
+            var entry = { value: v, sentAt: Date.now(), retries: 0 };
+            volInflight.push(entry);
+            window.debuglog('[slider] sending set ' + v + ' (inflight=' + volInflight.length + ')');
+            // record last sent for UI patience
+            slLastSentVol = v; slSentAt = Date.now();
+            ajax('POST','/vol','v='+v,function(){});
+            // schedule timeout check
+            (function(e){ setTimeout(function(){ checkInflightTimeout(e); }, volCmdTimeout); })(entry);
+            sliderQueueLatest = null;
+        } else {
+            // no capacity: remember latest to send later
+            sliderQueueLatest = v;
+            window.debuglog('[slider] queued set ' + v + ' (queued)');
+        }
     }
     // Pointer/mouse/touch start
     sl.addEventListener('pointerdown', function(){ slUserInteracting=true; });
@@ -468,7 +490,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Pointer/mouse/touch end: cancel debounce and send final value
     function finishSlider(){
         if(slDebounceTimer){ clearTimeout(slDebounceTimer); slDebounceTimer=null; }
-        sendSliderImmediate(function(){ poll(); });
+        // ensure final value is sent (will use inflight queue)
+        sliderQueueLatest = parseInt(sl.value,10);
+        trySendSlider();
+        // poll to refresh UI after finalization
+        setTimeout(poll,200);
         slUserInteracting=false;
     }
     sl.addEventListener('pointerup', finishSlider);
@@ -482,13 +508,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if(!slBusy){ sendSliderImmediate(); }
             return;
         }
-        // Debounce while the user is sliding
+        // Debounce while the user is sliding but send updates (short debounce)
         if(slDebounceTimer) clearTimeout(slDebounceTimer);
         slDebounceTimer = setTimeout(function(){
             slDebounceTimer = null;
-            sendSliderImmediate(function(){ poll(); });
-            slUserInteracting = false;
-        }, 250);
+            // queue/send slider value with the same inflight throttling as vol repeats
+            sliderQueueLatest = parseInt(sl.value,10);
+            trySendSlider();
+        }, 100);
     };
     sl.onchange=function(){ finishSlider(); };
   function poll(){
