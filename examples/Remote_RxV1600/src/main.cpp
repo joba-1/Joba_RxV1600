@@ -243,8 +243,19 @@ button:active{opacity:.7}
 <div class="vv" id="vol-value">-- dB</div>
 <input class="vs" id="vol-slider" type="range" min="-80" max="16" step="1" value="-40">
 <div class="vb">
- <button id="b-vdn" onmousedown="volRepeat(-1)" onmouseup="volStop()" onmouseleave="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9660;</button>
- <button id="b-vup" onmousedown="volRepeat(1)" onmouseup="volStop()" onmouseleave="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9650;</button>
+ <button id="b-vdn" onmousedown="volRepeat(-1)" onmouseup="volStop()" onmouseleave="volStop()" ontouchstart="volRepeat(-1)" ontouchend="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9660;</button>
+ <button id="b-vup" onmousedown="volRepeat(1)" onmouseup="volStop()" onmouseleave="volStop()" ontouchstart="volRepeat(1)" ontouchend="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9650;</button>
+<script>
+// Robust auto-repeat for both mouse and touch
+['b-vdn','b-vup'].forEach(function(id){
+ var btn=document.getElementById(id);
+ btn.addEventListener('touchstart',function(e){e.preventDefault();volRepeat(id==='b-vup'?1:-1);});
+ btn.addEventListener('touchend',function(e){e.preventDefault();volStop();});
+ btn.addEventListener('mousedown',function(e){volRepeat(id==='b-vup'?1:-1);});
+ btn.addEventListener('mouseup',volStop);
+ btn.addEventListener('mouseleave',volStop);
+});
+</script>
 </div>
 </div>
 
@@ -291,21 +302,28 @@ function volNext(){
  var v=volQ.shift();
  ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){volNext()});
 }
-var volRepTimer=null,volRepDir=0;
+var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
 function volRepeat(d){
  volRepDir=d;
  volStep(d);
- function rep(){volStep(d);volRepTimer=setTimeout(rep,120);}
+ function rep(){
+  if(volNoFeedback>=volRepeatLimit)return;
+  volStep(d);
+  volRepTimer=setTimeout(rep,120);
+ }
  volRepTimer=setTimeout(rep,350);
  if(window.getSelection)window.getSelection().removeAllRanges();
  if(document.selection)document.selection.empty();
 }
 function volStop(){
  if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
+ volQ=[]; // Immediately stop pending changes
+ volNoFeedback=0;
 }
 function volStep(d){
- if(volQ.length>=5)return;
+ if(volQ.length>=5||volNoFeedback>=volRepeatLimit)return;
  volQ.push(d);
+ volNoFeedback++;
  if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
 }
 var sl=document.getElementById('vol-slider'),slBusy=false;
@@ -344,6 +362,7 @@ function poll(){
   if(s.volDb>-999){
    document.getElementById('vol-value').textContent=s.volume;
    if(!slBusy)sl.value=s.volDb;
+   volNoFeedback=0; // Reset no-feedback counter on feedback
   }
   document.getElementById('ver').textContent = s.version;
 document.getElementById('info').innerHTML =
