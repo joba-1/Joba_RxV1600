@@ -179,6 +179,8 @@ button{flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:.9em;fon
 button:active{opacity:.7}
 .on{background:#2d6a4f}.off{background:#9b2226}
 .act{box-shadow:0 0 0 3px #a0c4ff;transform:scale(1.04)}
+.pnd{animation:pulse .6s infinite alternate}
+@keyframes pulse{from{opacity:1}to{opacity:.5}}
 .dis{opacity:.3;pointer-events:none}
 .vv{text-align:center;font-size:2.2em;font-weight:700;color:#a0c4ff;margin:8px 0;
  font-variant-numeric:tabular-nums}
@@ -267,7 +269,8 @@ function ajax(m,u,d,cb){
 function cmd(u,btn){
  if(busy)return;busy=true;
  if(btn){var sibs=btn.parentNode.querySelectorAll('button');
-  sibs.forEach(function(b){b.classList.toggle('act',b===btn)});
+  sibs.forEach(function(b){b.classList.toggle('act',b===btn);b.classList.remove('pnd')});
+  btn.classList.add('pnd');
   if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
   if(btn.id==='b-poff')document.getElementById('ctrl').classList.add('dis');
  }
@@ -298,7 +301,9 @@ function poll(){
   document.getElementById('st-night').textContent=s.night;
   document.getElementById('st-mute').textContent=s.mute;
   function hi(a,b,v){var x=document.getElementById(a),y=document.getElementById(b);
+   x.classList.remove('pnd');y.classList.remove('pnd');
    x.classList.toggle('act',v);y.classList.toggle('act',!v)}
+  if(!busy){
   hi('b-pon','b-poff',/Main On/.test(s.power));
   var on=/Main On/.test(s.power);
   document.getElementById('ctrl').classList.toggle('dis',!on);
@@ -307,6 +312,7 @@ function poll(){
   hi('b-bon','b-boff',s.spkB==='On');
   hi('b-day','b-ngt',s.night==='Off');
   hi('b-umut','b-mut',s.mute==='Off');
+  }
   if(s.volDb>-999){
    document.getElementById('vol-value').textContent=s.volume;
    if(!slBusy)sl.value=s.volDb;
