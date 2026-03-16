@@ -171,16 +171,17 @@ body{font-family:-apple-system,system-ui,sans-serif;background:#1a1a2e;color:#e0
  display:flex;flex-direction:column;align-items:center;padding:12px;overflow-x:hidden}
 .w{width:100%;max-width:380px}
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;margin-bottom:4px}
-.hdr span{font-size:.7em;text-transform:uppercase;color:#7a8ba8;letter-spacing:.04em}
-.hdr em{font-style:normal;font-size:.8em;color:#a0c4ff}
-.row{display:flex;gap:6px;margin-bottom:6px}
+.hdr span{font-size:.85em;text-transform:uppercase;color:#7a8ba8;letter-spacing:.04em}
+.hdr em{font-style:normal;font-size:.95em;color:#a0c4ff}
+.row{display:flex;gap:10px;margin:0 6px 10px}
 button{flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:.9em;font-weight:600;
  cursor:pointer;color:#fff;background:#3a506b;-webkit-tap-highlight-color:transparent}
 button:active{opacity:.7}
 .on{background:#2d6a4f}.off{background:#9b2226}
+.on:not(.act),.off:not(.act){opacity:.5}
 .act{box-shadow:0 0 0 3px #a0c4ff;transform:scale(1.04)}
-.pnd{animation:pulse .6s infinite alternate}
-@keyframes pulse{from{opacity:1}to{opacity:.5}}
+.pnd{animation:pulse .6s infinite alternate;opacity:1}
+@keyframes pulse{from{opacity:1}to{opacity:.6}}
 .dis{opacity:.3;pointer-events:none}
 .vv{text-align:center;font-size:2.2em;font-weight:700;color:#a0c4ff;margin:8px 0;
  font-variant-numeric:tabular-nums}
@@ -242,23 +243,22 @@ button:active{opacity:.7}
 <div class="vv" id="vol-value">-- dB</div>
 <input class="vs" id="vol-slider" type="range" min="-80" max="16" step="1" value="-40">
 <div class="vb">
- <button onclick="volStep(-1)">&#9660;</button>
- <button onclick="volStep(1)">&#9650;</button>
+ <button id="b-vdn" onmousedown="volRepeat(-1)" onmouseup="volStop()" onmouseleave="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9660;</button>
+ <button id="b-vup" onmousedown="volRepeat(1)" onmouseup="volStop()" onmouseleave="volStop()" onselectstart="return false;" style="user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;">&#9650;</button>
 </div>
 </div>
 
-<div class="info" id="info"></div>
-
-<div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">&#9881; System</div>
+<div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">Remote_RxV1600 v<span id='ver'></span> &#9881; System</div>
 <div class="sys" id="sys">
- <button onclick="if(confirm('Wipe WLAN config and restart?'))cmd('/wipe')">Wipe WLAN</button>
- <button onclick="if(confirm('Reset?'))cmd('/reset')">Reset</button>
+ <div class='info' id='info' style='margin-bottom:8px'></div>
+ <button onclick="if(confirm('Wipe WLAN config and restart?\n\nConnect to WiFi AP \x27remote-rxv1600\x27\nand open http://192.168.4.1 to reconfigure.')){cmd('/wipe');clearInterval(pollIv);document.body.style.opacity='.3';document.getElementById('info').textContent='Wiping WLAN config...'}">Wipe WLAN</button>
+ <button onclick="if(confirm('Reset device?')){cmd('/reset');clearInterval(pollIv);document.body.style.opacity='.3';var m=document.getElementById('info');m.textContent='Restarting...';window.resetIv=setInterval(function(){var x=new XMLHttpRequest();x.timeout=2000;x.onload=function(){if(document.body.style.opacity<1){clearInterval(window.resetIv);location.reload()}};x.open('GET','/state');x.send()},2000)}">Reset</button>
  <button onclick="location.href='/update'">Update</button>
 </div>
 </div>
 
 <script>
-var busy=false,volBusy=false,volTimer=null;
+var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
 function ajax(m,u,d,cb){
  var x=new XMLHttpRequest();
  x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
@@ -266,21 +266,47 @@ function ajax(m,u,d,cb){
  if(d){x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.send(d)}
  else x.send();
 }
+function hiBtn(btn){
+ if(!btn)return;
+ var sibs=btn.parentNode.querySelectorAll('button');
+ sibs.forEach(function(b){b.classList.toggle('act',b===btn);b.classList.remove('pnd')});
+ btn.classList.add('pnd');
+}
+function sendNext(){
+ if(!pending){inflight=false;setTimeout(poll,800);return}
+ var p=pending;pending=null;
+ ajax('POST',p.u,null,function(){sendNext()});
+}
 function cmd(u,btn){
- if(busy)return;busy=true;
- if(btn){var sibs=btn.parentNode.querySelectorAll('button');
-  sibs.forEach(function(b){b.classList.toggle('act',b===btn);b.classList.remove('pnd')});
-  btn.classList.add('pnd');
+ if(btn){
+  hiBtn(btn);
   if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
   if(btn.id==='b-poff')document.getElementById('ctrl').classList.add('dis');
  }
- ajax('POST',u,null,function(){busy=false;poll()});
+ pending={u:u};
+ if(!inflight){inflight=true;sendNext()}
+}
+function volNext(){
+ if(!volQ.length){volBusy=false;volTimer=setTimeout(poll,500);return}
+ var v=volQ.shift();
+ ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){volNext()});
+}
+var volRepTimer=null,volRepDir=0;
+function volRepeat(d){
+ volRepDir=d;
+ volStep(d);
+ function rep(){volStep(d);volRepTimer=setTimeout(rep,120);}
+ volRepTimer=setTimeout(rep,350);
+ if(window.getSelection)window.getSelection().removeAllRanges();
+ if(document.selection)document.selection.empty();
+}
+function volStop(){
+ if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
 }
 function volStep(d){
- if(volBusy)return;volBusy=true;
- ajax('POST',d>0?'/vol-up':'/vol-down',null,function(){
-  volBusy=false;if(volTimer)clearTimeout(volTimer);volTimer=setTimeout(poll,500);
- });
+ if(volQ.length>=5)return;
+ volQ.push(d);
+ if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
 }
 var sl=document.getElementById('vol-slider'),slBusy=false;
 sl.oninput=function(){
@@ -303,7 +329,7 @@ function poll(){
   function hi(a,b,v){var x=document.getElementById(a),y=document.getElementById(b);
    x.classList.remove('pnd');y.classList.remove('pnd');
    x.classList.toggle('act',v);y.classList.toggle('act',!v)}
-  if(!busy){
+  if(!inflight&&!volBusy){
   hi('b-pon','b-poff',/Main On/.test(s.power));
   var on=/Main On/.test(s.power);
   document.getElementById('ctrl').classList.toggle('dis',!on);
@@ -312,17 +338,21 @@ function poll(){
   hi('b-bon','b-boff',s.spkB==='On');
   hi('b-day','b-ngt',s.night==='Off');
   hi('b-umut','b-mut',s.mute==='Off');
+  document.getElementById('b-vup').classList.remove('pnd');
+  document.getElementById('b-vdn').classList.remove('pnd');
   }
   if(s.volDb>-999){
    document.getElementById('vol-value').textContent=s.volume;
    if(!slBusy)sl.value=s.volDb;
   }
-  document.getElementById('info').innerHTML=
-   (s.started?'Started '+s.started:'')+(s.built?' &middot; Built '+s.built:'')+'<br>'+
-   'v'+s.version+' &middot; '+(s.heap/1024|0)+'kB &middot; <a href="https://github.com/joba-1/Joba_RxV1600">Github</a>';
- });
+  document.getElementById('ver').textContent = s.version;
+document.getElementById('info').innerHTML =
+  (s.started ? 'Started ' + s.started : '') + (s.built ? ' &middot; Built ' + s.built : '') + '<br>' +
+  'Free RAM: ' + (s.heap/1024|0) + 'kB &middot; ' +
+  '<a href="https://github.com/joba-1/Joba_RxV1600">joba-1 Github</a>';
+});
 }
-poll();setInterval(poll,2000);
+poll();var pollIv=setInterval(poll,2000);
 </script>
 </body>
 </html>)rawliteral";
@@ -447,15 +477,26 @@ void setup_webserver() {
             "<!doctype html><html><head>"
             "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>" PROGNAME " Update</title>"
-            "<style>body{font-family:sans-serif;background:#1a1a2e;color:#e0e0e0;display:flex;"
-            "flex-direction:column;align-items:center;padding:40px}"
-            "h1{color:#a0c4ff}form{margin:20px}input{margin:8px;padding:8px;border-radius:8px;border:none}"
-            "input[type=submit]{background:#3a506b;color:white;cursor:pointer;padding:10px 24px}</style>"
-            "</head><body>"
-            "<h1>" PROGNAME " v" VERSION "</h1>"
+            "<style>"
+            "body{font-family:-apple-system,system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;"
+            "display:flex;justify-content:center;padding:40px 12px;margin:0}"
+            ".card{width:100%;max-width:380px;background:#16213e;border-radius:16px;padding:28px;text-align:center}"
+            "h1{color:#a0c4ff;font-size:1.2em;margin:0 0 4px}"
+            ".ver{color:#7a8ba8;font-size:.8em;margin-bottom:20px}"
+            "form{display:flex;flex-direction:column;gap:14px}"
+            "input[type=file]{background:#1a1a2e;border:2px dashed #3a506b;border-radius:10px;padding:16px;"
+            "color:#e0e0e0;cursor:pointer;font-size:.9em}"
+            "input[type=file]:hover{border-color:#a0c4ff}"
+            "input[type=submit]{background:#3a506b;color:#fff;border:none;border-radius:10px;"
+            "padding:12px;font-size:.95em;font-weight:600;cursor:pointer}"
+            "input[type=submit]:hover{background:#4a6a8b}"
+            "a{color:#a0c4ff;text-decoration:none;font-size:.9em;margin-top:8px;display:inline-block}"
+            "a:hover{text-decoration:underline}"
+            "</style></head><body><div class=\"card\">"
+            "<h1>" PROGNAME "</h1><div class=\"ver\">v" VERSION "</div>"
             "<form method='POST' action='/update' enctype='multipart/form-data'>"
-            "<input type='file' name='update'><input type='submit' value='Update'>"
-            "</form></body></html>";
+            "<input type='file' name='update'><input type='submit' value='Upload Firmware'>"
+            "</form><a href='/'>&#8592; Back</a></div></body></html>";
         request->send(200, "text/html", page);
     });
 
@@ -758,7 +799,7 @@ void setup() {
         slog("mDNS started", LOG_NOTICE);
     }
 
-    configTime(3600, 3600, NTP_SERVER);
+    configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", NTP_SERVER);
 
     setup_webserver();
 
