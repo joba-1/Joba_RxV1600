@@ -202,39 +202,39 @@ button:active{opacity:.7}
 
 <div class="hdr"><span>Power</span><em id="st-power"></em></div>
 <div class="row">
- <button id="b-pon" class="on" onclick="cmd('/power-on')">On</button>
- <button id="b-poff" class="off" onclick="cmd('/power-off')">Off</button>
+ <button id="b-pon" class="on" onclick="cmd('/power-on',this)">On</button>
+ <button id="b-poff" class="off" onclick="cmd('/power-off',this)">Off</button>
 </div>
 
 <div id="ctrl">
 <div class="hdr"><span>Input</span><em id="st-input"></em></div>
 <div class="row">
- <button id="b-tv" onclick="cmd('/tv')">TV</button>
- <button id="b-bt" onclick="cmd('/bt')">Bluetooth</button>
+ <button id="b-tv" onclick="cmd('/tv',this)">TV</button>
+ <button id="b-bt" onclick="cmd('/bt',this)">Bluetooth</button>
 </div>
 
 <div class="hdr"><span>Speaker A</span><em id="st-spkA"></em></div>
 <div class="row">
- <button id="b-aon" class="on" onclick="cmd('/a-on')">On</button>
- <button id="b-aoff" class="off" onclick="cmd('/a-off')">Off</button>
+ <button id="b-aon" class="on" onclick="cmd('/a-on',this)">On</button>
+ <button id="b-aoff" class="off" onclick="cmd('/a-off',this)">Off</button>
 </div>
 
 <div class="hdr"><span>Speaker B</span><em id="st-spkB"></em></div>
 <div class="row">
- <button id="b-bon" class="on" onclick="cmd('/b-on')">On</button>
- <button id="b-boff" class="off" onclick="cmd('/b-off')">Off</button>
+ <button id="b-bon" class="on" onclick="cmd('/b-on',this)">On</button>
+ <button id="b-boff" class="off" onclick="cmd('/b-off',this)">Off</button>
 </div>
 
 <div class="hdr"><span>Night</span><em id="st-night"></em></div>
 <div class="row">
- <button id="b-day" class="on" onclick="cmd('/day')">Day</button>
- <button id="b-ngt" class="off" onclick="cmd('/night')">Night</button>
+ <button id="b-day" class="on" onclick="cmd('/day',this)">Day</button>
+ <button id="b-ngt" class="off" onclick="cmd('/night',this)">Night</button>
 </div>
 
 <div class="hdr"><span>Mute</span><em id="st-mute"></em></div>
 <div class="row">
- <button id="b-umut" class="on" onclick="cmd('/mute-off')">Unmute</button>
- <button id="b-mut" class="off" onclick="cmd('/mute-on')">Mute</button>
+ <button id="b-umut" class="on" onclick="cmd('/mute-off',this)">Unmute</button>
+ <button id="b-mut" class="off" onclick="cmd('/mute-on',this)">Mute</button>
 </div>
 
 <div class="vv" id="vol-value">-- dB</div>
@@ -264,8 +264,13 @@ function ajax(m,u,d,cb){
  if(d){x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.send(d)}
  else x.send();
 }
-function cmd(u){
+function cmd(u,btn){
  if(busy)return;busy=true;
+ if(btn){var sibs=btn.parentNode.querySelectorAll('button');
+  sibs.forEach(function(b){b.classList.toggle('act',b===btn)});
+  if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
+  if(btn.id==='b-poff')document.getElementById('ctrl').classList.add('dis');
+ }
  ajax('POST',u,null,function(){busy=false;poll()});
 }
 function volStep(d){
