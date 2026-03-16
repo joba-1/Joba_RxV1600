@@ -277,15 +277,21 @@ button:active{opacity:.7}
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Robust auto-repeat for both mouse and touch
-  ['b-vdn','b-vup'].forEach(function(id){
-    var btn=document.getElementById(id);
-    btn.addEventListener('touchstart',function(e){e.preventDefault();volRepeat(id==='b-vup'?1:-1);});
-    btn.addEventListener('touchend',function(e){e.preventDefault();volStop();});
-    btn.addEventListener('mousedown',function(e){volRepeat(id==='b-vup'?1:-1);});
-    btn.addEventListener('mouseup',volStop);
-    btn.addEventListener('mouseleave',volStop);
-  });
+    // Robust auto-repeat using pointer events to avoid accidental mouseleave
+    // and to keep the pointer captured while dragging.
+    ['b-vdn','b-vup'].forEach(function(id){
+        var btn=document.getElementById(id);
+        btn.addEventListener('pointerdown', function(e){
+            e.preventDefault();
+            try{ btn.setPointerCapture(e.pointerId); }catch(ignore){}
+            volRepeat(id==='b-vup'?1:-1);
+        });
+        btn.addEventListener('pointerup', function(e){
+            try{ btn.releasePointerCapture(e.pointerId); }catch(ignore){}
+            volStop();
+        });
+        btn.addEventListener('pointercancel', function(e){ volStop(); });
+    });
 
   var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
   function ajax(m,u,d,cb){
@@ -316,13 +322,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if(!inflight){inflight=true;sendNext()}
   }
   function volNext(){
-    if(!volQ.length){volBusy=false;volTimer=setTimeout(poll,500);return}
-    var v=volQ.shift();
-    window.debuglog('[volNext] sending ' + (v > 0 ? 'up' : 'down'));
-    // Directly send, no callback chaining, allow parallel requests
-    ajax('POST',v>0?'/vol-up':'/vol-down',null,function(){});
-    // Schedule next step immediately
-    setTimeout(volNext, 10);
+        // Send up to volMaxInflight steps in parallel (start with 1).
+        if(!volQ.length){
+            // nothing to do; schedule poll
+            volTimer=setTimeout(poll,500);
+            return;
+        }
+        if(typeof volInflight === 'undefined') volInflight = 0;
+        if(typeof volMaxInflight === 'undefined') volMaxInflight = 1;
+        while(volQ.length && volInflight < volMaxInflight){
+            var v = volQ.shift();
+            volInflight++;
+            window.debuglog('[volNext] sending ' + (v > 0 ? 'up' : 'down') + ' (inflight=' + volInflight + ')');
+            ajax('POST', v>0?'/vol-up':'/vol-down', null, function(){
+                // server acknowledged; actual change confirmed via poll()
+            });
+        }
   }
   var volRepTimer=null,volRepDir=0,volNoFeedback=0,volRepeatLimit=3;
   var volLastStep=0;
@@ -344,16 +359,20 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   function volStop(){
     if(volRepTimer){clearTimeout(volRepTimer);volRepTimer=null;}
-    volQ=[]; // Immediately stop pending changes
-    volNoFeedback=0;
+        volQ=[]; // Immediately stop pending changes
+        volNoFeedback=0;
+        if(typeof volInflight !== 'undefined') volInflight = 0;
   }
   function volStep(d){
-    window.debuglog('[volStep] dir: ' + d + ' queue: ' + volQ.length + ' noFeedback: ' + volNoFeedback);
-    if(volQ.length>=4||volNoFeedback>=volRepeatLimit)return;
-    volQ.push(d);
-    volNoFeedback++;
-    volLastStep=Date.now();
-    if(!volBusy){volBusy=true;if(volTimer)clearTimeout(volTimer);volNext()}
+        window.debuglog('[volStep] dir: ' + d + ' queue: ' + volQ.length + ' noFeedback: ' + volNoFeedback);
+        // cap total outstanding steps (queued + inflight)
+        var infl = (typeof volInflight !== 'undefined') ? volInflight : 0;
+        if(volQ.length + infl >= 4) return;
+        volQ.push(d);
+        volLastStep=Date.now();
+        // try to send immediately if allowed
+        if(volTimer) clearTimeout(volTimer);
+        setTimeout(volNext, 0);
   }
     var sl=document.getElementById('vol-slider'),slBusy=false;
     // Track when the user is actively manipulating the slider to avoid
@@ -445,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
              slLastSentVol = null; slSentAt = 0;
          }
      }
-     if(reported !== null){
+        if(reported !== null){
          if(!slUserInteracting && !slDebounceTimer && !slBusy){
              sl.value = reported;
          }
@@ -455,6 +474,15 @@ document.addEventListener('DOMContentLoaded', function() {
      }
         window.debuglog('[poll] feedback received, reset noFeedback');
         volNoFeedback=0; // Reset no-feedback counter on feedback
+        // If we were waiting for feedback for sent vol commands, decrement
+        // inflight and try to send more queued steps.
+        if(typeof volInflight !== 'undefined' && volInflight>0){
+                volInflight = Math.max(0, volInflight-1);
+        }
+        if(volQ.length){
+                // send next available steps (respecting volMaxInflight)
+                setTimeout(volNext, 50);
+        }
     }
   document.getElementById('ver').textContent = s.version;
 document.getElementById('info').innerHTML =
