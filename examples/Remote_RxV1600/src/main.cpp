@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function hi(a,b,v){var x=document.getElementById(a),y=document.getElementById(b);
    x.classList.remove('pnd');y.classList.remove('pnd');
    x.classList.toggle('act',v);y.classList.toggle('act',!v)}
-  if(!inflight&&!volBusy){
+    if(!volBusy){
   hi('b-pon','b-poff',/Main On/.test(s.power));
   var on=/Main On/.test(s.power);
   document.getElementById('ctrl').classList.toggle('dis',!on);
