@@ -49,6 +49,7 @@ RxV1600Comm rxvcomm(Serial1);
 RxV1600 rxv;
 
 int first_vol = 0;
+char last_sent_cmd[128] = "";
 
 
 // define constant IsoDate as nicer variant of __DATE__
@@ -85,6 +86,21 @@ void slog(const char *message, uint16_t pri = LOG_INFO) {
     }
 }
 
+// dbg_printf used by lower-level comm module to route debug messages
+void dbg_printf(const char *fmt, ...) {
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    // print to Serial for local debugging
+    Serial.print(buf);
+    // also send to syslog (trim newline)
+    size_t len = strlen(buf);
+    if (len && buf[len-1] == '\n') buf[len-1] = '\0';
+    syslog.log(LOG_DEBUG, buf);
+}
+
 
 // JSON helper: escape a string value (handles NULL)
 const char *js(const char *s) {
@@ -92,26 +108,47 @@ const char *js(const char *s) {
 }
 
 
-// Send command directly to RX-V1600
-void send_cmd(const char *name) {
+// Send command directly to RX-V1600. Returns true if command was sent, false if busy or invalid.
+bool send_cmd(const char *name) {
     const char *cmd = rxv.command(name);
-    if( cmd ) {
-        if( !rxvcomm.send(cmd) ) {
-            snprintf(msg, sizeof(msg), "Busy, discarding command '%s'", name);
-            slog(msg);
-        }
+    if (!cmd) {
+        snprintf(msg, sizeof(msg), "No command mapping for '%s'", name);
+        slog(msg);
+        return false;
     }
+    if (!rxvcomm.send(cmd)) {
+        snprintf(msg, sizeof(msg), "Busy, discarding command '%s'", name);
+        slog(msg);
+        return false;
+    }
+    // record raw command sent for debugging
+    strncpy(last_sent_cmd, cmd, sizeof(last_sent_cmd)-1);
+    last_sent_cmd[sizeof(last_sent_cmd)-1] = '\0';
+    snprintf(msg, sizeof(msg), "Sent command '%s'", name);
+    slog(msg);
+    return true;
 }
 
 
-void send_cmd_value(const char *name, uint8_t value) {
+// Send a value command to RX-V1600. Returns true on send, false if busy/invalid.
+bool send_cmd_value(const char *name, uint8_t value) {
     const char *cmd = rxv.command_value(name, value);
-    if( cmd ) {
-        if( !rxvcomm.send(cmd) ) {
-            snprintf(msg, sizeof(msg), "Busy, discarding command '%s,%u'", name, value);
-            slog(msg);
-        }
+    if (!cmd) {
+        snprintf(msg, sizeof(msg), "No command mapping for '%s' value %u", name, value);
+        slog(msg);
+        return false;
     }
+    if (!rxvcomm.send(cmd)) {
+        snprintf(msg, sizeof(msg), "Busy, discarding command '%s,%u'", name, value);
+        slog(msg);
+        return false;
+    }
+    // record raw command sent for debugging
+    strncpy(last_sent_cmd, cmd, sizeof(last_sent_cmd)-1);
+    last_sent_cmd[sizeof(last_sent_cmd)-1] = '\0';
+    snprintf(msg, sizeof(msg), "Sent command '%s,%u'", name, value);
+    slog(msg);
+    return true;
 }
 
 
@@ -182,7 +219,11 @@ button:active{opacity:.7}
 .act{box-shadow:0 0 0 3px #a0c4ff;transform:scale(1.04)}
 .pnd{animation:pulse .6s infinite alternate;opacity:1}
 @keyframes pulse{from{opacity:1}to{opacity:.6}}
-.dis{opacity:.3;pointer-events:none}
+.dis{opacity:.3}
+.dis button{pointer-events:auto}
+/* Ensure buttons are always clickable even if parent containers are dimmed */
+.w button{pointer-events:auto!important}
+#ctrl, #ctrl *{pointer-events:auto!important}
 .vv{text-align:center;font-size:2.2em;font-weight:700;color:#a0c4ff;margin:8px 0;
  font-variant-numeric:tabular-nums}
 .vs{width:100%;height:48px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;margin:4px 0}
@@ -354,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ajax('POST',p.u,null,function(){sendNext()});
   }
     var controlLockedUntil = 0;
-    function cmd(u,btn){
+    window.cmd = function(u,btn){
     if(btn){
       hiBtn(btn);
       if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
@@ -362,8 +403,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
         // Lock control UI briefly so poll() doesn't immediately overwrite optimistic state
         controlLockedUntil = Date.now() + 1200;
-        pending={u:u};
-    if(!inflight){inflight=true;sendNext()}
+        // Send control commands immediately for responsiveness
+        ajax('POST', u, null, function(resp) {
+            // no-op callback; server will update state which poll() will pick up
+        });
   }
   function volNext(){
         // Send up to volMaxInflight steps in parallel.
@@ -626,6 +669,30 @@ pollIv=setInterval(poll,pollInterval);
 // Do not overwrite existing handlers; add listeners to speed polling while interacting
 sl.addEventListener('input', setPollFast);
 sl.addEventListener('change', setPollFast);
+    // Ensure top control buttons are definitely clickable (workaround for pointer capture/overlay)
+    ['b-pon','b-poff','b-tv','b-bt','b-aon','b-aoff','b-bon','b-boff','b-day','b-ngt','b-umut','b-mut']
+    .forEach(function(id){
+        var b = document.getElementById(id);
+        if(!b) return;
+        try{
+            b.style.setProperty('pointer-events','auto','important');
+            b.style.position = 'relative';
+            b.style.zIndex = 9999;
+            b.onselectstart = function(){ return false; };
+        }catch(e){ /* ignore */ }
+    });
+
+    // Temporary click visualizer: flashes a short inset outline when any button is clicked.
+    // Useful to confirm whether clicks reach the browser. Will be removed after debugging.
+    document.querySelectorAll('.w button').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            try{
+                var prev = btn.style.boxShadow || '';
+                btn.style.boxShadow = 'inset 0 0 0 3px #ffd166';
+                setTimeout(function(){ btn.style.boxShadow = prev; }, 250);
+            }catch(e){}
+        });
+    });
 });
 </script>
 </body>
@@ -643,46 +710,55 @@ void setup_webserver() {
 
     // Power
     web_server.on("/power-on", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("MainZonePower_On");
-        request->send(200);
+        bool ok = send_cmd("MainZonePower_On");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/power-off", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("MainZonePower_Off");
-        request->send(200);
+        bool ok = send_cmd("MainZonePower_Off");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
 
     // Input
     web_server.on("/tv", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("Input_Dtv");
-        request->send(200);
+        bool ok = send_cmd("Input_Dtv");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/bt", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("Input_Cbl-Sat");
-        request->send(200);
+        bool ok = send_cmd("Input_Cbl-Sat");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
 
     // Speakers
     web_server.on("/a-on", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("SpeakerRelayA_On");
-        request->send(200);
+        bool ok = send_cmd("SpeakerRelayA_On");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/a-off", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("SpeakerRelayA_Off");
-        request->send(200);
+        bool ok = send_cmd("SpeakerRelayA_Off");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/b-on", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("SpeakerRelayB_On");
-        request->send(200);
+        bool ok = send_cmd("SpeakerRelayB_On");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/b-off", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("SpeakerRelayB_Off");
-        request->send(200);
+        bool ok = send_cmd("SpeakerRelayB_Off");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
 
     // Night mode
     web_server.on("/day", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("NightMode_Off");
-        request->send(200);
+        bool ok = send_cmd("NightMode_Off");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/night", HTTP_POST, [](AsyncWebServerRequest *request) {
         const char *mode;
@@ -692,38 +768,45 @@ void setup_webserver() {
             case 0x11: case 0x21: mode = "NightMode_CinemaHigh"; break;
             default: mode = "NightMode_CinemaLow"; break;
         }
-        send_cmd(mode);
-        request->send(200);
+        bool ok = send_cmd(mode);
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
 
     // Mute
     web_server.on("/mute-on", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("Mute_On");
-        request->send(200);
+        bool ok = send_cmd("Mute_On");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/mute-off", HTTP_POST, [](AsyncWebServerRequest *request) {
-        send_cmd("Mute_Off");
-        request->send(200);
+        bool ok = send_cmd("Mute_Off");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
 
     // Volume
     web_server.on("/vol-up", HTTP_POST, [](AsyncWebServerRequest *request) {
         first_vol = 1;
-        send_cmd("MainVolume_Up");
-        request->send(200);
+        bool ok = send_cmd("MainVolume_Up");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/vol-down", HTTP_POST, [](AsyncWebServerRequest *request) {
         first_vol = -1;
-        send_cmd("MainVolume_Down");
-        request->send(200);
+        bool ok = send_cmd("MainVolume_Down");
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
     web_server.on("/vol", HTTP_POST, [](AsyncWebServerRequest *request) {
         String arg = request->arg("v");
+        bool ok = false;
         if (!arg.isEmpty()) {
             int volume = atoi(arg.c_str());
-            send_cmd_value("MainVolumeSet", volume * 2 + 199);
+            ok = send_cmd_value("MainVolumeSet", volume * 2 + 199);
         }
-        request->send(200);
+        if(ok) request->send(200, "text/plain", last_sent_cmd);
+        else request->send(503, "text/plain", "BUSY");
     });
 
     // Reset

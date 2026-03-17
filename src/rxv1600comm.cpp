@@ -1,6 +1,10 @@
 #include "rxv1600comm.h"
 
 #include <Arduino.h>
+#include <stdarg.h>
+
+// forward declaration of debug printf implemented in main firmware
+extern void dbg_printf(const char *fmt, ...);
 
 
 const uint32_t RxV1600Comm::TIMEOUT_MS = 1000;
@@ -31,7 +35,7 @@ void RxV1600Comm::on_recv(recv_t cb, void *ctx) {
 
 void RxV1600Comm::respond( bool valid ) {
     _resp[_pos] = '\0';
-    Serial.printf("DEBUG: recv '%s'\n", _resp);
+    dbg_printf("DEBUG: recv '%s'\n", _resp);
 
     _cmd = NULL;  // stop resending current command
     _pos = 0;     // reset response pointer
@@ -83,7 +87,7 @@ void RxV1600Comm::handle() {
                 _sent_ms = now;
                 _stream.print(_cmd);
                 last_comm = (now - 1) | 1;
-                Serial.printf("DEBUG: sent '%s'\n", _cmd);
+                dbg_printf("DEBUG: sent '%s'\n", _cmd);
             }
         }
     }
