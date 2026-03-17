@@ -87,18 +87,10 @@ void slog(const char *message, uint16_t pri = LOG_INFO) {
 }
 
 // dbg_printf used by lower-level comm module to route debug messages
+// Disabled in production builds to avoid verbose console/syslog noise.
 void dbg_printf(const char *fmt, ...) {
-    char buf[256];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    // print to Serial for local debugging
-    Serial.print(buf);
-    // also send to syslog (trim newline)
-    size_t len = strlen(buf);
-    if (len && buf[len-1] == '\n') buf[len-1] = '\0';
-    syslog.log(LOG_DEBUG, buf);
+    (void)fmt;
+    // intentionally no-op
 }
 
 
@@ -682,17 +674,7 @@ sl.addEventListener('change', setPollFast);
         }catch(e){ /* ignore */ }
     });
 
-    // Temporary click visualizer: flashes a short inset outline when any button is clicked.
-    // Useful to confirm whether clicks reach the browser. Will be removed after debugging.
-    document.querySelectorAll('.w button').forEach(function(btn){
-        btn.addEventListener('click', function(){
-            try{
-                var prev = btn.style.boxShadow || '';
-                btn.style.boxShadow = 'inset 0 0 0 3px #ffd166';
-                setTimeout(function(){ btn.style.boxShadow = prev; }, 250);
-            }catch(e){}
-        });
-    });
+    // Temporary click visualizer removed.
 });
 </script>
 </body>
