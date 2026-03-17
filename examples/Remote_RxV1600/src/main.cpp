@@ -250,15 +250,7 @@ button:active{opacity:.7}
 </div>
 
 <div class="tog" onclick="document.getElementById('sys').classList.toggle('show')">Remote_RxV1600 v<span id='ver'></span> &#9881; System</div>
-<div style="display:flex;gap:8px;align-items:center;margin:8px 0;">
-    <label style="font-size:.8em;color:#7a8ba8;display:flex;align-items:center;gap:6px;">
-        <input type="checkbox" id="debug-pause"> Pause updates
-    </label>
-    <button id="debug-copy" style="font-size:.8em;padding:6px;background:#3a506b;color:#fff;border-radius:6px;border:none;cursor:pointer">Copy</button>
-    <div style="flex:1"></div>
-</div>
-<div id="debuglog" style="background:#222;color:#0f0;font-size:.8em;max-height:90px;overflow:auto;margin:8px 0 4px 0;padding:4px 6px;border-radius:6px;display:block;white-space:pre-line;"></div>
-<script>window.onerror=function(msg,url,line,col,err){var el=document.getElementById('debuglog');if(el)el.textContent+='[EARLY JS ERROR] '+msg+' @'+line+':'+col+'\n';return false;};</script>
+<!-- debug UI removed (kept JS no-op logger) -->
 <div class="sys" id="sys">
  <div class='info' id='info' style='margin-bottom:8px'></div>
  <button onclick="if(confirm('Wipe WLAN config and restart?\n\nConnect to WiFi AP \x27remote-rxv1600\x27\nand open http://192.168.4.1 to reconfigure.')){cmd('/wipe');clearInterval(pollIv);document.body.style.opacity='.3';document.getElementById('info').textContent='Wiping WLAN config...'}">Wipe WLAN</button>
