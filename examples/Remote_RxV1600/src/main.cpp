@@ -353,13 +353,16 @@ document.addEventListener('DOMContentLoaded', function() {
     var p=pending;pending=null;
     ajax('POST',p.u,null,function(){sendNext()});
   }
-  function cmd(u,btn){
+    var controlLockedUntil = 0;
+    function cmd(u,btn){
     if(btn){
       hiBtn(btn);
       if(btn.id==='b-pon')document.getElementById('ctrl').classList.remove('dis');
       if(btn.id==='b-poff')document.getElementById('ctrl').classList.add('dis');
     }
-    pending={u:u};
+        // Lock control UI briefly so poll() doesn't immediately overwrite optimistic state
+        controlLockedUntil = Date.now() + 1200;
+        pending={u:u};
     if(!inflight){inflight=true;sendNext()}
   }
   function volNext(){
@@ -540,7 +543,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function hi(a,b,v){var x=document.getElementById(a),y=document.getElementById(b);
    x.classList.remove('pnd');y.classList.remove('pnd');
    x.classList.toggle('act',v);y.classList.toggle('act',!v)}
-    if(!volBusy){
+    if(!volBusy && Date.now() >= (typeof controlLockedUntil !== 'undefined' ? controlLockedUntil : 0)){
   hi('b-pon','b-poff',/Main On/.test(s.power));
   var on=/Main On/.test(s.power);
   document.getElementById('ctrl').classList.toggle('dis',!on);
