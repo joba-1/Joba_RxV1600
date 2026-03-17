@@ -305,13 +305,15 @@ button:active{opacity:.7}
         });
     }
 
-    window.debuglog = function(msg){
-        if(el && !debugPaused){
-            el.textContent += msg + '\n';
-            el.scrollTop = el.scrollHeight;
-        }
-    };
+    // Deactivate debug console by default to avoid DOM thrash while
+    // keeping the UI controls available for manual re-enable.
+    debugPaused = true;
+    if(chk) { chk.checked = true; }
+    if(btn) { btn.disabled = true; btn.textContent = 'Disabled'; }
+    if(el) { el.style.display = 'none'; }
+    window.debuglog = function(msg) { /* no-op */ };
     window.onerror = function(msg, url, line, col, error) {
+        // Still route errors into the no-op logger to avoid exceptions.
         window.debuglog('[JS ERROR] ' + msg + ' @' + line + ':' + col);
         return false;
     };
@@ -337,10 +339,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var pending=null,inflight=false,volQ=[],volBusy=false,volTimer=null;
     // Multi-inflight repeat control
     var volInflight = []; // array of {dir,sentAt,retries}
-    var volMaxInflight = 4; // allow up to 4 inflight volume steps (snappier repeat)
+    var volMaxInflight = 3; // allow up to 3 inflight volume steps (tuned)
     var volCmdTimeout = 1200; // ms to wait for feedback before retry
     var volMaxRetries = 2; // retry count per command
-    var volRepeatInterval = 180; // ms between auto-repeat steps when holding
+    var volRepeatInterval = 140; // ms between auto-repeat steps when holding (tuned)
   function ajax(m,u,d,cb){
     var x=new XMLHttpRequest();
     x.onreadystatechange=function(){if(x.readyState==4)cb(x)};
