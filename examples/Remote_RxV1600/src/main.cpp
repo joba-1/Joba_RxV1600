@@ -19,6 +19,11 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 
+// MQTT
+#include <PubSubClient.h>
+#include <cstring>
+
+
 
 // Time sync
 #include <time.h>
@@ -41,6 +46,14 @@ Syslog syslog(logUDP, SYSLOG_PROTO_IETF);
 char msg[512];
 
 char start_time[30];
+
+// MQTT client
+WiFiClient wifiMqtt;
+PubSubClient mqtt(wifiMqtt);
+
+
+// forward declare mqtt callback
+void mqtt_callback(char* topic, byte* payload, unsigned int length);
 
 
 #include <rxv1600.h>
@@ -83,6 +96,13 @@ void slog(const char *message, uint16_t pri = LOG_INFO) {
     if (log_infos && millis() > 10 * 60 * 1000) {
         log_infos = false;
         slog("Switch off info level messages", LOG_NOTICE);
+    }
+}
+
+
+void publish(const char *topic, const char *payload) {
+    if (mqtt.connected() && !mqtt.publish(topic, payload)) {
+        slog("Mqtt publish failed");
     }
 }
 
@@ -785,6 +805,8 @@ void setup_webserver() {
         bool ok = false;
         if (!arg.isEmpty()) {
             int volume = atoi(arg.c_str());
+            char cmd[30];
+            snprintf(cmd, sizeof(cmd), "MainVolumeSet,%d", volume * 2 + 199);
             ok = send_cmd_value("MainVolumeSet", volume * 2 + 199);
         }
         if(ok) request->send(200, "text/plain", last_sent_cmd);
@@ -925,6 +947,9 @@ bool check_ntptime() {
         strftime(start_time, sizeof(start_time), "%F %T", localtime(&now));
         snprintf(msg, sizeof(msg), "Got valid time at %s", start_time);
         slog(msg, LOG_NOTICE);
+        if (mqtt.connected()) {
+            publish(MQTT_TOPIC "/status/StartTime", start_time);
+        }
     }
 
     return have_time;
@@ -964,6 +989,139 @@ void handle_reboot() {
 }
 
 
+// Called on incoming mqtt messages
+void mqtt_callback(char* topic, byte* payload, unsigned int length) {
+    if (strcasecmp(MQTT_TOPIC "/cmd", topic) == 0) {
+        // copy payload to a safe, null-terminated buffer
+        char original[256];
+        size_t plen = (length < sizeof(original)-1) ? length : (sizeof(original)-1);
+        memcpy(original, payload, plen);
+        original[plen] = '\0';
+
+        snprintf(msg, sizeof(msg), "MQTT received on %s: '%s'", topic, original);
+        slog(msg);
+
+        // parse name[,value]
+        char tmp[256];
+        strncpy(tmp, original, sizeof(tmp)-1);
+        tmp[sizeof(tmp)-1] = '\0';
+
+        char *cmd_name = std::strtok(tmp, ",");
+        char *cmd_value = std::strtok(NULL, ",");
+        bool cmd_excess = (std::strtok(NULL, ",") != NULL);
+
+        if (cmd_name == NULL) {
+            snprintf(msg, sizeof(msg), "Empty mqtt payload on %s", topic);
+            slog(msg, LOG_WARNING);
+            return;
+        }
+
+        snprintf(msg, sizeof(msg), "Parsed mqtt payload: name='%s'%s", cmd_name, cmd_value ? ", with value" : "");
+        slog(msg);
+
+        const char *resolved = NULL;
+
+        if (cmd_value) {
+            if (cmd_excess) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt payload '%s': excess argument", original);
+                slog(msg, LOG_WARNING);
+                return;
+            }
+            size_t value_len = strlen(cmd_value);
+            char *endp;
+            unsigned long value = strtoul(cmd_value, &endp, 0);
+            if (endp != &cmd_value[value_len]) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt payload '%s': invalid numeric value", original);
+                slog(msg, LOG_WARNING);
+                return;
+            }
+            else if (value > 0xff) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt payload '%s': value overflow", original);
+                slog(msg, LOG_WARNING);
+                return;
+            }
+            else {
+                resolved = rxv.command_value(cmd_name, (uint8_t)value);
+            }
+        }
+        else {
+            resolved = rxv.command(cmd_name);
+        }
+
+        if (resolved) {
+            snprintf(msg, sizeof(msg), "Resolved mqtt command '%s' -> %s", cmd_name, resolved);
+            slog(msg);
+            bool sent = rxvcomm.send(resolved);
+            if (!sent) {
+                snprintf(msg, sizeof(msg), "Discarding mqtt command '%s' (device busy)", cmd_name);
+                slog(msg, LOG_WARNING);
+            }
+            else {
+                snprintf(msg, sizeof(msg), "Sent mqtt command '%s'", cmd_name);
+                slog(msg, LOG_INFO);
+            }
+        }
+        else {
+            // handle special textual payloads
+            if (strcasecmp("help", original) == 0) {
+                snprintf(msg, sizeof(msg), "MQTT help requested (ignored)");
+                slog(msg);
+            }
+            else if (strcasecmp("reset", original) == 0) {
+                slog("RESET via MQTT", LOG_NOTICE);
+                delay(100);
+                Serial1.end();
+                ESP.restart();
+            }
+            else {
+                snprintf(msg, sizeof(msg), "Ignore unknown mqtt payload '%s'", original);
+                slog(msg, LOG_WARNING);
+            }
+        }
+    }
+    else {
+        snprintf(msg, sizeof(msg), "Ignore mqtt topic %s: '%.*s'", topic, length, (char *)payload);
+        slog(msg, LOG_WARNING);
+    }
+}
+
+
+// MQTT reconnect/loop handler
+bool handle_mqtt(bool time_valid) {
+    static const int32_t interval = 5000;
+    static uint32_t prev = -interval;
+
+    if (mqtt.connected()) {
+        mqtt.loop();
+        return true;
+    }
+
+    uint32_t now = millis();
+    if (now - prev > interval) {
+        prev = now;
+
+            mqtt.setCallback(mqtt_callback);
+            if (mqtt.connect(HOSTNAME, MQTT_TOPIC "/status/LWT", 0, true, "Offline")
+                && mqtt.publish(MQTT_TOPIC "/status/LWT", "Online", true)
+                && mqtt.publish(MQTT_TOPIC "/status/Hostname", HOSTNAME)
+                && mqtt.publish(MQTT_TOPIC "/status/Version", VERSION)
+                && (!time_valid || mqtt.publish(MQTT_TOPIC "/status/StartTime", start_time))
+                && mqtt.subscribe(MQTT_TOPIC "/cmd") ) {
+            snprintf(msg, sizeof(msg), "Connected to MQTT broker %s:%d using topic %s", MQTT_SERVER, MQTT_PORT, MQTT_TOPIC);
+            slog(msg, LOG_NOTICE);
+            return true;
+        }
+
+        int error = mqtt.state();
+        mqtt.disconnect();
+        snprintf(msg, sizeof(msg), "Connect to MQTT broker %s:%d failed with code %d", MQTT_SERVER, MQTT_PORT, error);
+        slog(msg, LOG_ERR);
+    }
+
+    return false;
+}
+
+
 void recvd(const char *resp, void *ctx) {
     bool power;
     uint8_t id;
@@ -978,6 +1136,18 @@ void recvd(const char *resp, void *ctx) {
         if( rxv.decodeConfig(resp, power) ) {
             snprintf(msg, sizeof(msg), "Got config while power is %s", power ? "on" : "off");
             slog(msg);
+            for( unsigned i=0; i<=0xff; i++ ) {
+                const char *nm = rxv.report_name(i);
+                const char *val = rxv.report_value_string(i);
+                if( nm || val ) {
+                    snprintf(msg, sizeof(msg), "Config x%02X: %s = %s", i, nm ? nm : "invalid", val ? val : "invalid");
+                    slog(msg);
+                    if( nm ) {
+                        snprintf(msg, sizeof(msg), MQTT_TOPIC "/status/%s", nm);
+                        mqtt.publish(msg, val ? val : "");
+                    }
+                }
+            }
         }
         else if( rxv.decode(resp, id, guard, origin) ) {
             name = rxv.report_name(id);
@@ -1009,11 +1179,21 @@ void recvd(const char *resp, void *ctx) {
                 }
                 first_vol = 0;
             }
+            else if( name ) {
+                char topic[128];
+                snprintf(topic, sizeof(topic), MQTT_TOPIC "/status/%s", name);
+                publish(topic, value ? value : "");
+            }
         }
         else if( rxv.decodeText(resp, id, text) ) {
             name = rxv.display_name(id);
             snprintf(msg, sizeof(msg), "Display x%02X: %s = %s", id, name ? name : "invalid", text);
             slog(msg);
+            if( name ) {
+                char topic[128];
+                snprintf(topic, sizeof(topic), MQTT_TOPIC "/status/%s", name);
+                mqtt.publish(topic, text);
+            }
         }
         else {
             snprintf(msg, sizeof(msg), "Ignoring unknown response '%s'", resp);
@@ -1142,6 +1322,9 @@ void setup() {
 
     setup_webserver();
 
+    // MQTT setup
+    mqtt.setServer(MQTT_SERVER, MQTT_PORT);
+
     print_reset_reason(0);
     print_reset_reason(1);
 
@@ -1162,4 +1345,7 @@ void loop() {
     handle_pin();
     handle_wifi();
     handle_reboot();
+
+    // MQTT handling (publish commands from web and publish status updates from receiver)
+    handle_mqtt(check_ntptime());
 }
