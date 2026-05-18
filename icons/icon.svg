@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="32" fill="#1c1c1c"/>
+  <rect x="14" y="46" width="152" height="88" rx="8" fill="#2b2b2b" stroke="#4a4a4a" stroke-width="2"/>
+  <rect x="26" y="58" width="78" height="22" rx="3" fill="#0a0a0a"/>
+  <text x="32" y="74" font-family="'Courier New',monospace" font-size="14" fill="#ff9b2e" font-weight="700">RX-V1600</text>
+  <circle cx="132" cy="98" r="22" fill="#0a0a0a" stroke="#6a6a6a" stroke-width="2"/>
+  <circle cx="132" cy="98" r="14" fill="#3a3a3a"/>
+  <line x1="132" y1="84" x2="132" y2="92" stroke="#ff9b2e" stroke-width="3" stroke-linecap="round"/>
+  <g fill="#6a6a6a">
+    <circle cx="36" cy="100" r="4"/>
+    <circle cx="52" cy="100" r="4"/>
+    <circle cx="68" cy="100" r="4"/>
+    <circle cx="84" cy="100" r="4"/>
+  </g>
+  <rect x="26" y="114" width="78" height="10" rx="2" fill="#0a0a0a"/>
+  <rect x="28" y="116" width="40" height="6" fill="#ff9b2e"/>
+</svg>
